@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+
+# Frontend dependencies and build output
+node_modules/
+.next/
+
+# Local environment files
+.env
+.env.*
+!.env.example
