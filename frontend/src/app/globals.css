@@ -1,0 +1,609 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Formula1 Display Bold";
+  src: url("/fonts/Formula1-Bold_web_0.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.landing-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.landing-title {
+  margin: 0;
+  padding-top: 62px;
+  color: #14171a;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.landing-image {
+  display: block;
+  width: min(760px, calc(100% - 32px));
+  height: auto;
+  margin: 28px auto 0;
+  border-radius: 18px;
+}
+
+.enter-button {
+  margin-top: 36px;
+  margin-bottom: 0;
+  padding: 14px 42px;
+  border: 2px solid #39ff14;
+  border-radius: 999px;
+  background: #39ff14;
+  color: #071007;
+  cursor: pointer;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgba(57, 255, 20, 0.8);
+}
+
+.enter-button:hover {
+  background: #071007;
+  color: #39ff14;
+}
+
+.race-page {
+  min-height: 100vh;
+  padding-bottom: 100px;
+  background: #94a3b8;
+  color: #14171a;
+}
+
+.race-page-title {
+  margin: 0;
+  padding-top: 62px;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.race-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+  width: min(1120px, calc(100% - 48px));
+  margin: 28px auto 0;
+}
+
+.countdown-card {
+  width: 430px;
+  max-width: calc(100% - 48px);
+  min-height: 104px;
+  margin: 28px auto 0;
+  gap: 10px;
+}
+
+.race-card.countdown-card {
+  width: 430px;
+  max-width: calc(100% - 48px);
+}
+
+.countdown-card span {
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+}
+
+.countdown-card strong {
+  color: #facc15;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.bank-card {
+  width: min(260px, calc(100% - 48px));
+  min-height: 86px;
+  margin: 18px auto 0;
+  gap: 10px;
+}
+
+.bank-card strong, .race-card-section strong {
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.race-card-section {
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.race-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 150px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #7f8fa3;
+}
+
+.race-card span {
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.driver-select,
+.race-text-input {
+  width: min(190px, 100%);
+  padding: 10px 12px;
+  border: 2px solid #39ff14;
+  border-radius: 10px;
+  background: #64748b;
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.race-text-input::placeholder {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.over-under-grid-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 32px;
+}
+
+.over-under-heading {
+  margin: 0;
+  text-align: center;
+}
+
+.over-under-card.race-card {
+  min-height: 0;
+  gap: 12px;
+}
+
+.over-under-card.race-card .driver-select,
+.over-under-card.race-card .race-text-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.wager-field {
+  width: min(150px, 100%);
+}
+
+.wager-control {
+  display: grid;
+  grid-template-columns: 38px minmax(64px, 1fr) 38px;
+  width: 100%;
+  overflow: hidden;
+  border: 2px solid #39ff14;
+  border-radius: 10px;
+}
+
+.wager-control button,
+.wager-control input {
+  min-height: 38px;
+  border: 0;
+  background: #64748b;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.wager-control button {
+  cursor: pointer;
+  color: #39ff14;
+}
+
+.wager-control input {
+  border-right: 1px solid rgba(57, 255, 20, 0.45);
+  border-left: 1px solid rgba(57, 255, 20, 0.45);
+  text-align: center;
+}
+
+.wager-control input::placeholder {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.wager-control input::-webkit-outer-spin-button,
+.wager-control input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.wager-control input[type="number"] {
+  appearance: textfield;
+}
+
+.wager-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bet-button,
+.cancel-button {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 2px solid #39ff14;
+  border-radius: 10px;
+  background: #39ff14;
+  color: #071007;
+  cursor: pointer;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bet-button:hover {
+  background: #071007;
+  color: #39ff14;
+}
+
+.cancel-button {
+  border-color: #d1d5db;
+  background: #d1d5db;
+  color: #14171a;
+}
+
+.cancel-button:hover {
+  background: #14171a;
+  color: #d1d5db;
+}
+
+.telemetry-shell {
+  min-height: 100vh;
+  padding: 24px 12px 96px;
+  background: #f4f6f8;
+  color: #14171a;
+}
+
+.telemetry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1120px;
+  margin: 0 auto 24px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0062ff;
+}
+
+.telemetry-header h1 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.1;
+}
+
+.status-pill {
+  min-width: 132px;
+  padding: 10px 14px;
+  border: 1px solid #c7d1db;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: center;
+  font-weight: 700;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 1120px;
+  margin: 0 auto 24px;
+}
+
+.stats-grid div {
+  border: 1px solid #d5dde5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.stats-grid div {
+  padding: 16px;
+}
+
+.stats-grid span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #5b6876;
+}
+
+.stats-grid strong {
+  font-size: 28px;
+}
+
+.race-chart {
+  width: 100%;
+  margin: 0;
+}
+
+.race-title {
+  margin: 0 0 18px;
+  color: #14171a;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.chart-title-row span {
+  color: #5b6876;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chart-title-row strong {
+  font-size: 16px;
+}
+
+.lap-axis-chart {
+  position: relative;
+  overflow-x: auto;
+  min-height: 76px;
+}
+
+.axis-canvas {
+  position: relative;
+  min-width: 1280px;
+}
+
+.race-track {
+  position: relative;
+  overflow: hidden;
+  height: 32px;
+  margin-top: 8px;
+  border: 1px solid #8fa1b3;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px #d9e2ec;
+}
+
+.race-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0050d8, #24a148);
+  transition: width 120ms linear;
+}
+
+.lap-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(20, 23, 26, 0.16);
+}
+
+.lap-ticks {
+  position: relative;
+  height: 22px;
+  margin-top: 10px;
+  color: #344054;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.lap-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.driver-bars {
+  display: grid;
+  gap: 14px;
+}
+
+.driver-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 104px;
+  align-items: center;
+  gap: 12px;
+}
+
+.driver-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #14171a;
+}
+
+.driver-distance {
+  font-size: 14px;
+  text-align: right;
+  color: #1f2937;
+}
+
+.recharts-panel {
+  width: 100%;
+  min-width: 0;
+  min-height: 420px;
+}
+
+.podium-flash {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  animation: podium-flash 900ms ease-in-out infinite;
+}
+
+.podium-place {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 58px;
+  border: 2px solid #14171a;
+  background: #ffffff;
+  color: #14171a;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(20, 23, 26, 0.18);
+}
+
+.podium-place span {
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.podium-place strong {
+  font-size: 26px;
+}
+
+.podium-place-1 {
+  border-color: #facc15;
+}
+
+.podium-place-2 {
+  border-color: #64748b;
+}
+
+.podium-place-3 {
+  border-color: #b45309;
+}
+
+@keyframes podium-flash {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.52;
+    transform: translateY(-2px);
+  }
+}
+
+.race-chart:empty::before {
+  display: block;
+  padding: 24px;
+  border: 1px dashed #b8c4d1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #5b6876;
+  content: "Waiting for telemetry stream...";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .race-fill {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .telemetry-shell {
+    padding: 20px 10px 190px;
+  }
+
+  .telemetry-header,
+  .race-chart {
+    grid-template-columns: 1fr;
+  }
+
+  .telemetry-header {
+    display: grid;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-title-row {
+    display: grid;
+  }
+
+  .race-chart {
+    overflow-x: auto;
+  }
+
+  .lap-axis-chart {
+    min-width: 0;
+  }
+
+  .driver-row {
+    grid-template-columns: 1fr;
+  }
+
+  .driver-distance {
+    text-align: left;
+  }
+
+  .podium-flash {
+    grid-template-columns: 1fr;
+  }
+}
