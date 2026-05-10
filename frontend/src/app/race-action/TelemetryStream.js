@@ -17,12 +17,12 @@ const RACE_TITLE = "2026 Miami Grand Prix Race";
 const RACE_DISTANCE_DOMAIN = 310000;
 const FINAL_LAP = 57;
 const TOP_DRIVER_COLORS = [
-  "#F59E0B",
-  "#64748B",
-  "#B45309",
-  "#2563EB",
-  "#16A34A",
-  "#9333EA",
+  "#E10600",  // Ferrari Red (1st place)
+  "#0090FF",  // Racing Blue (2nd place)
+  "#FF8700",  // McLaren Orange (3rd place)
+  "#00D2BE",  // Mercedes Teal (4th place)
+  "#6692FF",  // Alpine Blue (5th place)
+  "#DC0000",  // Red Bull Red (6th place)
 ];
 const FINISH_LABELS = ["1st finish", "2nd finish", "3rd finish"];
 const PODIUM_LABELS = ["1st", "2nd", "3rd"];
@@ -60,7 +60,7 @@ function rankDrivers(drivers) {
     });
 }
 
-export default function AccumulatingStream() {
+export default function AccumulatingStream({ shouldStart = true }) {
   const [data, setData] = useState([]);
   const [podium, setPodium] = useState([]);
   const dataRef = useRef(data);
@@ -94,6 +94,10 @@ export default function AccumulatingStream() {
   }, [data]);
 
   useEffect(() => {
+    if (!shouldStart) {
+      return;
+    }
+
     const events = new EventSource(`${API_URL}/laps/stream`);
 
     function playNextLap() {
@@ -185,7 +189,7 @@ export default function AccumulatingStream() {
       events.close();
       clearInterval(timerRef.current);
     };
-  }, []);
+  }, [shouldStart]);
 
   return (
     <main className="telemetry-shell">

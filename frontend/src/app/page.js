@@ -1,4 +1,3 @@
-import TelemetryStream from "./TelemetryStream";
 import Landing from "./LandingComponent";
 
 export default function Home() {
