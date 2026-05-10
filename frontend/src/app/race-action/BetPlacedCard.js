@@ -10,17 +10,17 @@ export default function BetPlacedCard({
   overUnder,
 }) {
   return (
-    <div className={`race-card ${selected ? 'race-card-selected' : ''}`}>
-      {bettingMarket && <span>{bettingMarket}</span>}
-      <div className="race-text-input" style={{ width: '100%', textAlign: 'center' }}>
+    <div className={`race-card bet-placed-card ${selected ? 'race-card-selected' : ''}`}>
+      {bettingMarket && <span className="bet-placed-market">{bettingMarket}</span>}
+      <div className="bet-placed-driver">
         {driver}
       </div>
       {overUnder && (
-        <div className="race-text-input" style={{ width: '100%', textAlign: 'center' }}>
+        <div className="bet-placed-info">
           {overUnder}
         </div>
       )}
-      <div className="race-text-input" style={{ width: '100%', textAlign: 'center' }}>
+      <div className="bet-placed-amount">
         ${betAmount}
       </div>
     </div>

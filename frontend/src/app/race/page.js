@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import BettingCard from "./BettingCard";
-import CountdownCard from "./CountdownCard";
+
+const CountdownCard = dynamic(() => import("./CountdownCard"), {
+  ssr: false,
+});
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const INITIAL_BANK = 500;
-const RACE_COUNTDOWN_SECONDS = 300; // 5 minutes
+const RACE_COUNTDOWN_SECONDS = 120; // 2 minutes
 const BETTING_MARKETS = [
   "Race Winner",
   "Top 3 Finish",
@@ -19,94 +25,101 @@ const BETTING_MARKETS = [
   "1st Place +2 Sec",
 ];
 
+function saveBetState({
+  selectedBets,
+  wagers,
+  selectedDrivers,
+  overUnderDriver,
+  overUnderSide,
+  overUnderWager,
+  overUnderBetPlaced,
+}) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem('selectedBets', JSON.stringify(selectedBets));
+  localStorage.setItem('bettingMarkets', JSON.stringify(BETTING_MARKETS));
+  localStorage.setItem('wagers', JSON.stringify(wagers));
+  localStorage.setItem('selectedDrivers', JSON.stringify(selectedDrivers));
+  localStorage.setItem('overUnderDriver', overUnderDriver);
+  localStorage.setItem('overUnderSide', overUnderSide);
+  localStorage.setItem('overUnderWager', overUnderWager);
+  localStorage.setItem('overUnderBetPlaced', String(overUnderBetPlaced));
+  localStorage.setItem(
+    'placedBets',
+    JSON.stringify(buildPlacedBets(BETTING_MARKETS, selectedBets, wagers, selectedDrivers)),
+  );
+  localStorage.setItem(
+    'placedOverUnderBet',
+    JSON.stringify(buildPlacedOverUnderBet(
+      overUnderDriver,
+      overUnderSide,
+      overUnderWager,
+      overUnderBetPlaced,
+    )),
+  );
+}
+
+function buildPlacedBets(markets, selectedBets, wagers, selectedDrivers) {
+  return markets
+    .map((market, index) => ({
+      market,
+      index,
+      selected: selectedBets[index],
+      wager: wagers[index],
+      driver: selectedDrivers[index],
+    }))
+    .filter((bet) => bet.selected && bet.market && bet.driver && Number(bet.wager) > 0);
+}
+
+function buildPlacedOverUnderBet(driver, side, wager, isPlaced) {
+  if (!isPlaced || !driver || !side || Number(wager) <= 0) {
+    return null;
+  }
+
+  return {
+    driver,
+    overUnder: side,
+    wager,
+    bettingMarket: "First Lap 90 sec",
+  };
+}
+
 export default function RacePage() {
   const router = useRouter();
   const [drivers, setDrivers] = useState([]);
-  const [bank, setBank] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bank');
-      const savedWagers = localStorage.getItem('wagers');
-      const savedSelectedBets = localStorage.getItem('selectedBets');
-      
-      // If we have saved data, use the saved bank value
-      if (saved) {
-        return Number(saved);
+  const [showIncompleteModal, setShowIncompleteModal] = useState(false);
+  const [showBetPlacedModal, setShowBetPlacedModal] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const [countdown, setCountdown] = useState(RACE_COUNTDOWN_SECONDS);
+  const [wagers, setWagers] = useState(Array(BETTING_MARKETS.length).fill(""));
+  const [selectedBets, setSelectedBets] = useState(Array(BETTING_MARKETS.length).fill(false));
+  const [selectedDrivers, setSelectedDrivers] = useState(Array(BETTING_MARKETS.length).fill(""));
+  const [overUnderDriver, setOverUnderDriver] = useState("");
+  const [overUnderSide, setOverUnderSide] = useState("");
+  const [overUnderWager, setOverUnderWager] = useState("");
+  const [overUnderBetPlaced, setOverUnderBetPlaced] = useState(false);
+
+  // Calculate bank as INITIAL_BANK - totalWagered
+  const bank = useMemo(() => {
+    let totalWagered = 0;
+    
+    // Sum up all placed bets from betting cards
+    wagers.forEach((wager, index) => {
+      if (selectedBets[index]) {
+        totalWagered += Number(wager) || 0;
       }
-      
-      // Otherwise, calculate bank from initial minus any placed bets
-      if (savedWagers && savedSelectedBets) {
-        const wagers = JSON.parse(savedWagers);
-        const selectedBets = JSON.parse(savedSelectedBets);
-        const totalWagered = wagers.reduce((sum, wager, index) => {
-          return sum + (selectedBets[index] ? (Number(wager) || 0) : 0);
-        }, 0);
-        return INITIAL_BANK - totalWagered;
-      }
-      
-      return INITIAL_BANK;
+    });
+    
+    // Add over/under bet if placed
+    if (overUnderBetPlaced) {
+      totalWagered += Number(overUnderWager) || 0;
     }
-    return INITIAL_BANK;
-  });
-  const [countdown, setCountdown] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('countdown');
-      const savedTimestamp = localStorage.getItem('countdownTimestamp');
-      
-      if (saved && savedTimestamp) {
-        const elapsed = Math.floor((Date.now() - Number(savedTimestamp)) / 1000);
-        const remaining = Math.max(0, Number(saved) - elapsed);
-        return remaining;
-      }
-      
-      // Initialize countdown for the first time
-      localStorage.setItem('countdown', String(RACE_COUNTDOWN_SECONDS));
-      localStorage.setItem('countdownTimestamp', String(Date.now()));
-      return RACE_COUNTDOWN_SECONDS;
-    }
-    return RACE_COUNTDOWN_SECONDS;
-  });
-  const [wagers, setWagers] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('wagers');
-      return saved ? JSON.parse(saved) : Array(BETTING_MARKETS.length).fill("");
-    }
-    return Array(BETTING_MARKETS.length).fill("");
-  });
-  const [selectedBets, setSelectedBets] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedBets');
-      return saved ? JSON.parse(saved) : Array(BETTING_MARKETS.length).fill(false);
-    }
-    return Array(BETTING_MARKETS.length).fill(false);
-  });
-  const [selectedDrivers, setSelectedDrivers] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedDrivers');
-      return saved ? JSON.parse(saved) : Array(BETTING_MARKETS.length).fill("");
-    }
-    return Array(BETTING_MARKETS.length).fill("");
-  });
-  const [overUnderDriver, setOverUnderDriver] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('overUnderDriver');
-      return saved || "";
-    }
-    return "";
-  });
-  const [overUnderSide, setOverUnderSide] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('overUnderSide');
-      return saved || "";
-    }
-    return "";
-  });
-  const [overUnderWager, setOverUnderWager] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('overUnderWager');
-      return saved || "";
-    }
-    return "";
-  });
+    
+    return INITIAL_BANK - totalWagered;
+  }, [wagers, selectedBets, overUnderWager, overUnderBetPlaced]);
 
   function updateWager(index, newValue) {
     setWagers((currentWagers) =>
@@ -130,29 +143,54 @@ export default function RacePage() {
     
     // Validate that both wager and driver are selected
     if (wagerAmount <= 0 || !driver) {
+      setShowIncompleteModal(true);
+      setTimeout(() => setShowIncompleteModal(false), 2000);
       return;
     }
 
-    setBank((currentBank) => Math.max(0, currentBank - wagerAmount));
-    setSelectedBets((currentSelected) =>
-      currentSelected.map((selected, betIndex) =>
-        betIndex === index ? true : selected
-      )
+    const nextSelectedBets = selectedBets.map((selected, betIndex) =>
+      betIndex === index ? true : selected
     );
+
+    setSelectedBets(nextSelectedBets);
+    saveBetState({
+      selectedBets: nextSelectedBets,
+      wagers,
+      selectedDrivers,
+      overUnderDriver,
+      overUnderSide,
+      overUnderWager,
+      overUnderBetPlaced,
+    });
+    
+    // Show success modal
+    setShowBetPlacedModal(true);
+    setTimeout(() => setShowBetPlacedModal(false), 2000);
   }
 
   function cancelBet(index) {
-    const wagerAmount = Number(wagers[index]) || 0;
-    if (wagerAmount <= 0) {
-      return;
-    }
-
-    setBank((currentBank) => Math.min(INITIAL_BANK, currentBank + wagerAmount));
-    setSelectedBets((currentSelected) =>
-      currentSelected.map((selected, betIndex) =>
-        betIndex === index ? false : selected
-      )
+    const nextSelectedBets = selectedBets.map((selected, betIndex) =>
+      betIndex === index ? false : selected
     );
+    const nextWagers = wagers.map((wager, wagerIndex) =>
+      wagerIndex === index ? "" : wager
+    );
+    const nextSelectedDrivers = selectedDrivers.map((driver, driverIndex) =>
+      driverIndex === index ? "" : driver
+    );
+
+    setSelectedBets(nextSelectedBets);
+    setWagers(nextWagers);
+    setSelectedDrivers(nextSelectedDrivers);
+    saveBetState({
+      selectedBets: nextSelectedBets,
+      wagers: nextWagers,
+      selectedDrivers: nextSelectedDrivers,
+      overUnderDriver,
+      overUnderSide,
+      overUnderWager,
+      overUnderBetPlaced,
+    });
   }
 
   function updateOverUnderWager(step) {
@@ -164,41 +202,112 @@ export default function RacePage() {
 
   function placeOverUnderBet() {
     const wagerAmount = Number(overUnderWager) || 0;
-    if (wagerAmount <= 0) {
+    const driver = overUnderDriver;
+    const side = overUnderSide;
+    
+    // Validate that all fields are filled
+    if (wagerAmount <= 0 || !driver || !side) {
+      setShowIncompleteModal(true);
+      setTimeout(() => setShowIncompleteModal(false), 2000);
       return;
     }
 
-    setBank((currentBank) => Math.max(0, currentBank - wagerAmount));
+    setOverUnderBetPlaced(true);
+    saveBetState({
+      selectedBets,
+      wagers,
+      selectedDrivers,
+      overUnderDriver,
+      overUnderSide,
+      overUnderWager,
+      overUnderBetPlaced: true,
+    });
+    
+    // Show success modal
+    setShowBetPlacedModal(true);
+    setTimeout(() => setShowBetPlacedModal(false), 2000);
   }
 
   function cancelOverUnderBet() {
-    const wagerAmount = Number(overUnderWager) || 0;
-    if (wagerAmount <= 0) {
-      return;
-    }
-
-    setBank((currentBank) => Math.min(INITIAL_BANK, currentBank + wagerAmount));
+    // Reset all over/under fields
+    setOverUnderBetPlaced(false);
+    setOverUnderWager("");
+    setOverUnderDriver("");
+    setOverUnderSide("");
+    saveBetState({
+      selectedBets,
+      wagers,
+      selectedDrivers,
+      overUnderDriver: "",
+      overUnderSide: "",
+      overUnderWager: "",
+      overUnderBetPlaced: false,
+    });
   }
 
+  // Initialize client-side state from localStorage
   useEffect(() => {
+    setIsClient(true);
+    
+    // Load countdown
+    const saved = localStorage.getItem('countdown');
+    const savedTimestamp = localStorage.getItem('countdownTimestamp');
+    
+    if (saved && savedTimestamp) {
+      const elapsed = Math.floor((Date.now() - Number(savedTimestamp)) / 1000);
+      const remaining = Math.max(0, Number(saved) - elapsed);
+      setCountdown(remaining);
+    } else {
+      // Initialize countdown for the first time
+      localStorage.setItem('countdown', String(RACE_COUNTDOWN_SECONDS));
+      localStorage.setItem('countdownTimestamp', String(Date.now()));
+      setCountdown(RACE_COUNTDOWN_SECONDS);
+    }
+    
+    // Load other state from localStorage
+    const savedWagers = localStorage.getItem('wagers');
+    if (savedWagers) setWagers(JSON.parse(savedWagers));
+    
+    const savedBets = localStorage.getItem('selectedBets');
+    if (savedBets) setSelectedBets(JSON.parse(savedBets));
+    
+    const savedDrivers = localStorage.getItem('selectedDrivers');
+    if (savedDrivers) setSelectedDrivers(JSON.parse(savedDrivers));
+    
+    const savedOverUnderDriver = localStorage.getItem('overUnderDriver');
+    if (savedOverUnderDriver) setOverUnderDriver(savedOverUnderDriver);
+    
+    const savedOverUnderSide = localStorage.getItem('overUnderSide');
+    if (savedOverUnderSide) setOverUnderSide(savedOverUnderSide);
+    
+    const savedOverUnderWager = localStorage.getItem('overUnderWager');
+    if (savedOverUnderWager) setOverUnderWager(savedOverUnderWager);
+    
+    const savedOverUnderBetPlaced = localStorage.getItem('overUnderBetPlaced');
+    if (savedOverUnderBetPlaced) setOverUnderBetPlaced(savedOverUnderBetPlaced === 'true');
+    
+    // Fetch drivers
     fetch(`${API_URL}/`)
       .then((response) => response.json())
       .then((data) => setDrivers(data.drivers ?? []))
       .catch(() => setDrivers([]));
+
+    setStorageLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedBets', JSON.stringify(selectedBets));
-      localStorage.setItem('bettingMarkets', JSON.stringify(BETTING_MARKETS));
-      localStorage.setItem('wagers', JSON.stringify(wagers));
-      localStorage.setItem('selectedDrivers', JSON.stringify(selectedDrivers));
-      localStorage.setItem('bank', String(bank));
-      localStorage.setItem('overUnderDriver', overUnderDriver);
-      localStorage.setItem('overUnderSide', overUnderSide);
-      localStorage.setItem('overUnderWager', overUnderWager);
+    if (storageLoaded) {
+      saveBetState({
+        selectedBets,
+        wagers,
+        selectedDrivers,
+        overUnderDriver,
+        overUnderSide,
+        overUnderWager,
+        overUnderBetPlaced,
+      });
     }
-  }, [selectedBets, wagers, selectedDrivers, bank, overUnderDriver, overUnderSide, overUnderWager]);
+  }, [storageLoaded, selectedBets, wagers, selectedDrivers, overUnderDriver, overUnderSide, overUnderWager, overUnderBetPlaced]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -215,13 +324,39 @@ export default function RacePage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-navigate to race-action page when countdown reaches zero
+  useEffect(() => {
+    if (countdown === 0) {
+      router.push('/race-action');
+    }
+  }, [countdown, router]);
+
+  // Don't render until client-side hydration is complete
+  if (!isClient) {
+    return null;
+  }
+
   return (
     <main className="race-page">
+      {showIncompleteModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <p>Incomplete Info</p>
+          </div>
+        </div>
+      )}
+      {showBetPlacedModal && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-success">
+            <p>Bet Placed</p>
+          </div>
+        </div>
+      )}
       <h1 className="race-page-title">F1 Racing Sports Betting</h1>
       <CountdownCard countdown={countdown} raceName="Miami Grand Prix" />
       <section className="bank-card race-card">
         <span>BANK</span>
-        <strong>${bank}</strong>
+        <strong suppressHydrationWarning>${bank}</strong>
       </section>
       <button
         className="proceed-to-race-button"
@@ -249,7 +384,7 @@ export default function RacePage() {
         ))}
 
         <div className="over-under-grid-cell">
-          <div className="race-card-section over-under-heading">OVER / UNDER</div>
+          <div className="race-card-section over-under-heading">Under/Over</div>
           <div className={`race-card over-under-card ${countdown <= 10 ? 'race-card-disabled' : ''}`}>
             <span>FIRST LAP 90 SEC</span>
             <select

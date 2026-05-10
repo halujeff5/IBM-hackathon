@@ -27,6 +27,14 @@ const TOP_DRIVER_COLORS = [
 const FINISH_LABELS = ["1st finish", "2nd finish", "3rd finish"];
 const PODIUM_LABELS = ["1st", "2nd", "3rd"];
 
+function podiumLabel(index) {
+  return PODIUM_LABELS[index] ?? `${index + 1}th`;
+}
+
+function clampRaceDistance(distance) {
+  return Math.min(RACE_DISTANCE_DOMAIN, Math.max(0, Number(distance) || 0));
+}
+
 function lapDistance(points) {
   return points.reduce(
     (maxDistance, point) => Math.max(maxDistance, Number(point.distance) || 0),
@@ -60,15 +68,19 @@ function rankDrivers(drivers) {
     });
 }
 
-export default function AccumulatingStream({ shouldStart = true }) {
+export default function AccumulatingStream({ shouldStart = true, onRaceFinished }) {
   const [data, setData] = useState([]);
   const [podium, setPodium] = useState([]);
+  const [raceFinished, setRaceFinished] = useState(false);
   const dataRef = useRef(data);
   const queueRef = useRef([]);
   const timerRef = useRef(null);
   const animatingRef = useRef(false);
+  const streamFinishedRef = useRef(false);
+  const onRaceFinishedRef = useRef(onRaceFinished);
   const chartData = rankDrivers(data);
   const chartHeight = Math.max(420, chartData.length * 34);
+  const podiumDrivers = podium.slice(0, PODIUM_LABELS.length);
   const renderFinishLabel = ({ x, y, width, height, index }) => {
     const driver = chartData[index];
     if (!driver || driver.place > 3 || driver.total <= 0) {
@@ -83,6 +95,7 @@ export default function AccumulatingStream({ shouldStart = true }) {
         fill={driver.fill}
         fontSize={13}
         fontWeight={700}
+        fontFamily="Formula1 Display Bold, Arial Black, Impact, sans-serif"
       >
         {FINISH_LABELS[driver.place - 1]}
       </text>
@@ -94,15 +107,35 @@ export default function AccumulatingStream({ shouldStart = true }) {
   }, [data]);
 
   useEffect(() => {
+    onRaceFinishedRef.current = onRaceFinished;
+  }, [onRaceFinished]);
+
+  useEffect(() => {
+    if (raceFinished) {
+      const callbackTimer = setTimeout(() => {
+        onRaceFinishedRef.current?.();
+      }, 0);
+
+      return () => clearTimeout(callbackTimer);
+    }
+  }, [raceFinished]);
+
+  useEffect(() => {
     if (!shouldStart) {
       return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('telemetryData');
+      localStorage.removeItem('telemetryPodium');
+      localStorage.removeItem('telemetryStreamFinished');
     }
 
     const events = new EventSource(`${API_URL}/laps/stream`);
 
     function playNextLap() {
       const incoming = queueRef.current.shift();
-      if (!incoming) {
+      if (!incoming || streamFinishedRef.current) {
         animatingRef.current = false;
         return;
       }
@@ -134,8 +167,9 @@ export default function AccumulatingStream({ shouldStart = true }) {
             return {
               ...driver,
               lap: incoming.lap,
-              total:
+              total: clampRaceDistance(
                 baseTotals[driver.name] + Math.max(0, Number(point.distance) || 0),
+              ),
             };
           }),
         );
@@ -144,6 +178,8 @@ export default function AccumulatingStream({ shouldStart = true }) {
 
         if (pointIndex >= maxPoints) {
           clearInterval(timerRef.current);
+          let finalPodium = null;
+
           setData((currentData) => {
             const finalData = mergeDriverRows(currentData, incoming.drivers).map((driver) => {
               const driverLap = incoming.drivers.find(
@@ -157,22 +193,43 @@ export default function AccumulatingStream({ shouldStart = true }) {
               return {
                 ...driver,
                 lap: incoming.lap,
-                total: baseTotals[driver.name] + lapDistance(driverLap.points),
+                total: clampRaceDistance(
+                  baseTotals[driver.name] + lapDistance(driverLap.points),
+                ),
               };
             });
 
             if (incoming.lap === FINAL_LAP) {
-              setPodium(rankDrivers(finalData).slice(0, 3));
+              finalPodium = rankDrivers(finalData).slice(0, 3);
+              streamFinishedRef.current = true;
+              queueRef.current = [];
+              events.close();
             }
 
             return finalData;
           });
+
+          if (incoming.lap === FINAL_LAP) {
+            if (finalPodium) {
+              setPodium(finalPodium);
+            }
+
+            setRaceFinished(true);
+            animatingRef.current = false;
+            return;
+          }
+
           playNextLap();
         }
       }, 20);
     }
 
     events.onmessage = (event) => {
+      if (streamFinishedRef.current) {
+        events.close();
+        return;
+      }
+
       const incoming = JSON.parse(event.data);
       queueRef.current.push(incoming);
 
@@ -231,7 +288,7 @@ export default function AccumulatingStream({ shouldStart = true }) {
           </ResponsiveContainer>
         </div>
       </section>
-      {podium.length === 3 && (
+      {podiumDrivers.length === PODIUM_LABELS.length && (
         <aside
           className="podium-flash"
           aria-live="polite"
@@ -246,7 +303,7 @@ export default function AccumulatingStream({ shouldStart = true }) {
             gap: 10,
           }}
         >
-          {podium.map((driver, index) => (
+          {podiumDrivers.map((driver, index) => (
             <div
               key={driver.name}
               className={`podium-place podium-place-${index + 1}`}
@@ -256,14 +313,14 @@ export default function AccumulatingStream({ shouldStart = true }) {
                 justifyContent: "center",
                 gap: 10,
                 minHeight: 58,
-                border: `2px solid ${TOP_DRIVER_COLORS[index]}`,
+                border: `2px solid ${TOP_DRIVER_COLORS[index] ?? "#39ff14"}`,
                 background: "#ffffff",
                 color: "#14171a",
                 fontWeight: 800,
                 boxShadow: "0 8px 24px rgba(20, 23, 26, 0.18)",
               }}
             >
-              <span>{PODIUM_LABELS[index]}</span>
+              <span>{podiumLabel(index)}</span>
               <strong style={{ fontSize: 26 }}>{driver.name}</strong>
             </div>
           ))}

@@ -7,6 +7,15 @@ import { useRouter } from 'next/navigation';
 export default function LandingComponent() {
     const router = useRouter();
 
+    const handleEnter = () => {
+        // Set countdown to 3 minutes (180 seconds) when entering from home screen
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('countdown', '180');
+            localStorage.setItem('countdownTimestamp', String(Date.now()));
+        }
+        router.push('/race');
+    };
+
     return (
         <section className="landing-hero">
             <h1 className="landing-title">F1 Racing Sports Betting</h1>
@@ -21,7 +30,7 @@ export default function LandingComponent() {
             <button
                 className="enter-button"
                 type="button"
-                onClick={() => router.push('/race')}
+                onClick={handleEnter}
             >
                 Enter
             </button>

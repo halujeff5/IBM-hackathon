@@ -85,7 +85,7 @@ body {
 .race-page {
   min-height: 100vh;
   padding-bottom: 100px;
-  background: #94a3b8;
+  background: #B8B8B8;
   color: #14171a;
 }
 
@@ -195,7 +195,8 @@ body {
 .over-under-grid-cell {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  grid-column: 1 / -1;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
   margin-top: 32px;
@@ -203,10 +204,11 @@ body {
 
 .over-under-heading {
   margin: 0;
-  text-align: center;
+  text-align: left;
 }
 
 .over-under-card.race-card {
+  width: min(260px, 100%);
   min-height: 0;
   gap: 12px;
 }
@@ -345,17 +347,33 @@ body {
   color: #39ff14;
 }
 
+.proceed-to-race-button:disabled,
+.proceed-to-race-button-dimmed {
+  background: #3f4854;
+  border-color: #5f6b7a;
+  color: #9aa5b3;
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.85);
+}
+
+.proceed-to-race-button:disabled:hover,
+.proceed-to-race-button-dimmed:hover {
+  background: #3f4854;
+  color: #9aa5b3;
+}
+
 .race-action-page {
   display: block;
   min-height: 100vh;
-  padding: 24px;
-  background: #94a3b8;
+  padding: 44px 24px 24px;
+  background: #B8B8B8;
 }
 
 .active-bets-sidebar {
   width: 100%;
   max-width: 1120px;
-  margin: 0 auto 24px;
+  margin: 20px auto 24px;
 }
 
 .active-bets-title {
@@ -374,10 +392,40 @@ body {
   gap: 22px;
 }
 
+.bet-placed-card {
+  min-height: 100px;
+  padding: 12px;
+  gap: 8px;
+}
+
+.bet-placed-card .bet-placed-market {
+  font-size: 14px;
+}
+
+.bet-placed-card .bet-placed-driver,
+.bet-placed-card .bet-placed-info,
+.bet-placed-card .bet-placed-amount {
+  width: 100%;
+  padding: 6px 8px;
+  border: 2px solid #39ff14;
+  border-radius: 8px;
+  background: #64748b;
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bet-placed-card .bet-placed-amount {
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .telemetry-shell {
   min-height: 100vh;
   padding: 24px 12px 96px;
-  background: #94a3b8;
+  background: #B8B8B8;
   color: #14171a;
 }
 
@@ -562,6 +610,19 @@ body {
   min-height: 420px;
 }
 
+.recharts-panel .recharts-cartesian-axis-tick-value {
+  fill: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-weight: 800;
+}
+
+.recharts-panel .recharts-yAxis .recharts-cartesian-axis-tick-value {
+  fill: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
+}
+
 .podium-flash {
   position: fixed;
   right: 12px;
@@ -677,5 +738,70 @@ body {
 
   .podium-flash {
     grid-template-columns: 1fr;
+  }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  animation: modal-fade-in 200ms ease-out;
+}
+
+.modal-content {
+  min-width: 280px;
+  padding: 32px 40px;
+  border: 3px solid #39ff14;
+  border-radius: 18px;
+  background: #14171a;
+  box-shadow: 0 0 32px rgba(57, 255, 20, 0.4);
+  animation: modal-scale-in 200ms ease-out;
+}
+
+.modal-content p {
+  margin: 0;
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+}
+
+.modal-content.modal-success {
+  border-color: #39ff14;
+  box-shadow: 0 0 32px rgba(57, 255, 20, 0.6);
+}
+
+.modal-content.modal-success p {
+  color: #39ff14;
+  text-shadow: 0 0 16px rgba(57, 255, 20, 0.8);
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
