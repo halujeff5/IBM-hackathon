@@ -4,14 +4,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import TelemetryStream from "./TelemetryStream";
+import RacePositionMap from "./RacePositionMap";
 import BetPlacedCard from "./BetPlacedCard";
 import CountdownCard from "../race/CountdownCard";
 import RacerCard from "./RacerCard";
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const BETTING_PAGE_ROUTE = "/race";
-const RACER_CARD_LIMIT = 22;
+const RACER_CARD_LIMIT = 8;
+const POINT_STEP = 8;
+const REALTIME_PLAYBACK_RATE = 20;
+const MAX_FRAME_DELAY_MS = 1200;
 
 function telemetryFromPoint(point = {}) {
     return {
@@ -20,6 +23,8 @@ function telemetryFromPoint(point = {}) {
         brake: Math.max(0, Number(point.brake) || 0),
         gear: Math.max(0, Number(point.gear) || 0),
         throttle: Math.max(0, Number(point.throttle) || 0),
+        x: Number(point.x),
+        y: Number(point.y),
     };
 }
 
@@ -52,22 +57,36 @@ function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousT
     });
 }
 
+function pointTimeAt(drivers, pointIndex) {
+    const times = drivers
+        .map((driver) => {
+            const point = driver.points?.[Math.min(pointIndex, Math.max(0, driver.points.length - 1))];
+            const time = Number(point?.time);
+
+            return Number.isFinite(time) ? time : null;
+        })
+        .filter((time) => time !== null);
+
+    return times.length ? Math.max(...times) : 0;
+}
+
+function realtimeDelay(drivers, pointIndex, nextPointIndex) {
+    const currentTime = pointTimeAt(drivers, pointIndex);
+    const nextTime = pointTimeAt(drivers, nextPointIndex);
+    const deltaSeconds = Math.max(0, nextTime - currentTime);
+
+    return Math.min(MAX_FRAME_DELAY_MS, Math.round((deltaSeconds * 1000) / REALTIME_PLAYBACK_RATE));
+}
+
 function topRacerCards(racers) {
-    // Create a sorted ranking to assign positions
     const sorted = [...racers]
         .sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name));
-    
-    // Create a map of driver name to position
-    const positionMap = new Map(
-        sorted.map((racer, index) => [racer.name, index + 1])
-    );
-    
-    // Return first 8 drivers in their original order with updated positions
-    return racers
+
+    return sorted
         .slice(0, RACER_CARD_LIMIT)
-        .map((racer) => ({
+        .map((racer, index) => ({
             ...racer,
-            position: positionMap.get(racer.name) ?? 0
+            position: index + 1
         }));
 }
 
@@ -211,7 +230,7 @@ export default function RaceActionPage() {
             );
             let pointIndex = 0;
 
-            timer = setInterval(() => {
+            function playPoint() {
                 setRacerTelemetry((currentTelemetry) => {
                     const nextTelemetry = buildRacerTelemetry(
                         driverNames,
@@ -226,15 +245,14 @@ export default function RaceActionPage() {
                     return nextTelemetry;
                 });
 
-                pointIndex += 8;
+                const nextPointIndex = pointIndex + POINT_STEP;
 
-                if (pointIndex >= maxPoints) {
-                    clearInterval(timer);
+                if (nextPointIndex >= maxPoints) {
                     setRacerTelemetry((currentTelemetry) => {
                         const nextTelemetry = buildRacerTelemetry(
                             driverNames,
                             incoming.drivers,
-                            maxPoints,
+                            maxPoints - 1,
                             currentTelemetry,
                             baseTotals,
                         );
@@ -253,8 +271,15 @@ export default function RaceActionPage() {
                     }
 
                     playNextLap();
+                    return;
                 }
-            }, 20);
+
+                const delay = realtimeDelay(incoming.drivers, pointIndex, nextPointIndex);
+                pointIndex = nextPointIndex;
+                timer = setTimeout(playPoint, delay);
+            }
+
+            playPoint();
         }
 
         events.onmessage = (event) => {
@@ -276,7 +301,7 @@ export default function RaceActionPage() {
 
         return () => {
             events.close();
-            clearInterval(timer);
+            clearTimeout(timer);
         };
     }, [streamStarted]);
 
@@ -359,9 +384,20 @@ export default function RaceActionPage() {
                     </div>
                 </aside>
             )}
-            <TelemetryStream
-                shouldStart={streamStarted}
-                onRaceFinished={() => setRaceFinished(true)}
+            <RacePositionMap
+                racers={racerTelemetry.length > 0
+                    ? [...racerTelemetry].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))
+                    : drivers.map((driver) => ({
+                        name: driver,
+                        speed: 0,
+                        brake: 0,
+                        gear: 1,
+                        throttle: 0,
+                        total: 0,
+                        disabled: !streamStarted,
+                    }))}
+                limit={22}
+                driverCount={22}
             />
             {racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0 && (
                 <div style={{

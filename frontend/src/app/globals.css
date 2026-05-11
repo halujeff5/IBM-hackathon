@@ -364,10 +364,23 @@ body {
 }
 
 .race-action-page {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-height: 100vh;
   padding: 44px 24px 24px;
   background: #B8B8B8;
+}
+
+.racer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  margin: 28px auto 0;
+  padding: 0 12px 0 0;
+  box-sizing: border-box;
 }
 
 .active-bets-sidebar {
@@ -423,6 +436,7 @@ body {
 }
 
 .telemetry-shell {
+  width: 100%;
   min-height: 100vh;
   padding: 24px 12px 96px;
   background: #B8B8B8;
@@ -803,5 +817,141 @@ body {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+.race-position-map {
+  width: min(1630px, calc(100% - 32px));
+  margin: 28px auto 36px;
+  padding: 18px;
+  border: 2px solid #14171a;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(20, 23, 26, 0.14);
+}
+
+.race-position-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.race-position-map-header h2 {
+  margin: 0;
+  color: #14171a;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.race-position-map-header span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.race-position-content {
+  display: grid;
+  grid-template-columns: 480px minmax(0, 1440px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.race-position-svg {
+  display: block;
+  width: 100%;
+  height: min(78vh, 820px);
+  min-height: 560px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.race-position-grid-bg {
+  fill: #ffffff;
+}
+
+.race-position-grid-line {
+  stroke: #e5e7eb;
+  stroke-width: 0.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.race-track-curb {
+  fill: none;
+  stroke: #9ca3af;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+}
+
+.race-track-asphalt {
+  fill: none;
+  stroke: #6b7280;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.35;
+}
+
+.race-position-empty-text {
+  fill: #64748b;
+  font-size: 4px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.race-position-featured {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.race-position-rank-row {
+  display: grid;
+  grid-template-columns: 26px 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #14171a;
+}
+
+.race-position-rank-number {
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.race-position-rank-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.race-position-rank-row strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .race-position-content {
+    grid-template-columns: 1fr;
+  }
+
+  .race-position-featured {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

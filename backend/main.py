@@ -18,66 +18,102 @@ app.add_middleware(
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LAP_DATA_DIR = PROJECT_ROOT / "data" / "lapdata"
+LAP_DATA_DIR = PROJECT_ROOT / "data" / "allData"
 LAP_COUNT = 57
-TELEMETRY_COLUMNS = ["time", "distance"]
+TELEMETRY_COLUMNS = ["time", "distance", "speed", "brake", "gear", "throttle", "x", "y"]
 LAP_FILE_PATTERN = re.compile(r"^([A-Z]{3})lap(\d+)\.pkl$")
 
 
-def discover_drivers() -> list[str]:
-    drivers = {}
-    for path in LAP_DATA_DIR.glob("*lap*.pkl"):
+def discover_lap_files() -> dict[str, dict[int, Path]]:
+    lap_files: dict[str, dict[int, Path]] = {}
+
+    for path in LAP_DATA_DIR.glob("*.pkl"):
         match = LAP_FILE_PATTERN.match(path.name)
-        if match:
-            drivers.setdefault(match.group(1), set()).add(int(match.group(2)))
+        if not match:
+            continue
 
-    return [
-        driver
-        for driver, laps in sorted(drivers.items())
-        if all(lap_number in laps for lap_number in range(1, LAP_COUNT + 1))
-    ]
+        driver = path.name[:3]
+        lap_number = int(match.group(2))
+        lap_files.setdefault(driver, {})[lap_number] = path
 
-
-DRIVERS = discover_drivers()
+    return lap_files
 
 
-def lap_path(driver: str, lap_number: int) -> Path:
-    nested_path = LAP_DATA_DIR / driver / f"{driver}lap{lap_number}.pkl"
-    if nested_path.exists():
-        return nested_path
-
-    return LAP_DATA_DIR / f"{driver}lap{lap_number}.pkl"
+def discover_drivers(lap_files: dict[str, dict[int, Path]] | None = None) -> list[str]:
+    return sorted(lap_files if lap_files is not None else discover_lap_files())
 
 
-def load_lap(driver: str, lap_number: int) -> pd.DataFrame:
-    with lap_path(driver, lap_number).open("rb") as f:
+def lap_path(
+    driver: str,
+    lap_number: int,
+    lap_files: dict[str, dict[int, Path]] | None = None,
+) -> Path:
+    driver_prefix = driver[:3].upper()
+
+    return (lap_files if lap_files is not None else discover_lap_files())[driver_prefix][lap_number]
+
+
+def load_lap(
+    driver: str,
+    lap_number: int,
+    lap_files: dict[str, dict[int, Path]] | None = None,
+) -> pd.DataFrame:
+    with lap_path(driver, lap_number, lap_files).open("rb") as f:
         return pickle.load(f)
 
 
-def serialize_driver_lap(driver: str, lap_number: int) -> dict:
-    lap_data = load_lap(driver, lap_number)
+def serialize_driver_lap(
+    driver: str,
+    lap_number: int,
+    lap_files: dict[str, dict[int, Path]],
+) -> dict:
+    if lap_number not in lap_files.get(driver, {}):
+        return {
+            "name": driver,
+            "lap": lap_number,
+            "active": False,
+            "sourceFile": None,
+            "points": [],
+        }
+
+    lap_data = load_lap(driver, lap_number, lap_files)
+    telemetry_columns = [
+        column for column in TELEMETRY_COLUMNS if column in lap_data.columns
+    ]
+    telemetry = lap_data[telemetry_columns].where(
+        pd.notnull(lap_data[telemetry_columns]),
+        None,
+    )
+
     return {
         "name": driver,
         "lap": lap_number,
-        "points": lap_data[TELEMETRY_COLUMNS].to_dict(orient="records"),
+        "active": True,
+        "sourceFile": lap_path(driver, lap_number, lap_files).name,
+        "points": telemetry.to_dict(orient="records"),
     }
 
 
 def serialize_lap(lap_number: int) -> dict:
+    lap_files = discover_lap_files()
+    drivers = discover_drivers(lap_files)
+
     return {
         "lap": lap_number,
         "drivers": [
-            serialize_driver_lap(driver, lap_number)
-            for driver in DRIVERS
+            serialize_driver_lap(driver, lap_number, lap_files)
+            for driver in drivers
         ],
     }
 
 
 @app.get("/")
 async def fetch_race():
+    lap_files = discover_lap_files()
+
     return {
         "laps": LAP_COUNT,
-        "drivers": DRIVERS,
+        "drivers": discover_drivers(lap_files),
         "streamUrl": "/laps/stream",
     }
 
@@ -95,6 +131,8 @@ async def stream_laps():
 
 @app.get("/laps/metadata")
 async def fetch_lap_metadata():
+    lap_files = discover_lap_files()
+
     return {
         "drivers": [
             {
@@ -103,13 +141,14 @@ async def fetch_lap_metadata():
                     {
                         "lap": lap_number,
                         "maxDistance": float(
-                            load_lap(driver, lap_number)["distance"].max()
+                            load_lap(driver, lap_number, lap_files)["distance"].max()
                         ),
                     }
                     for lap_number in range(1, LAP_COUNT + 1)
+                    if lap_number in lap_files.get(driver, {})
                 ],
             }
-            for driver in DRIVERS
+            for driver in discover_drivers(lap_files)
         ],
     }
 

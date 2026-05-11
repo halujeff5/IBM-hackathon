@@ -53,16 +53,26 @@ function mergeDriverRows(currentData, incomingDrivers) {
 }
 
 function rankDrivers(drivers) {
+  let previousTotal = null;
+  let previousPlace = 0;
+
   return [...drivers]
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
     .map((driver, index) => {
-      const place = index + 1;
-      const isTopDriver = place <= 6 && driver.total > 0;
+      const roundedTotal = Math.round(driver.total);
+      const tiedWithPrevious = previousTotal !== null && roundedTotal === previousTotal;
+      const place = tiedWithPrevious ? previousPlace : index + 1;
+      const isTopDriver = index < 6 && driver.total > 0;
+
+      previousTotal = roundedTotal;
+      previousPlace = place;
 
       return {
         ...driver,
         place,
-        displayName: isTopDriver ? `P${place} ${driver.name}` : driver.name,
+        displayName: isTopDriver
+          ? `${tiedWithPrevious ? "T" : "P"}${place} ${driver.name}`
+          : driver.name,
         fill: isTopDriver ? TOP_DRIVER_COLORS[index] : "#4F46E5",
       };
     });
@@ -164,6 +174,10 @@ export default function AccumulatingStream({ shouldStart = true, onRaceFinished 
             const point =
               driverLap.points[Math.min(pointIndex, driverLap.points.length - 1)];
 
+            if (!point) {
+              return driver;
+            }
+
             return {
               ...driver,
               lap: incoming.lap,
@@ -221,7 +235,7 @@ export default function AccumulatingStream({ shouldStart = true, onRaceFinished 
 
           playNextLap();
         }
-      }, 20);
+      }, 60);
     }
 
     events.onmessage = (event) => {
