@@ -11,7 +11,7 @@ import RacerCard from "./RacerCard";
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const BETTING_PAGE_ROUTE = "/race";
-const RACER_CARD_LIMIT = 8;
+const RACER_CARD_LIMIT = 6;
 const POINT_STEP = 8;
 const REALTIME_PLAYBACK_RATE = 20;
 const MAX_FRAME_DELAY_MS = 1200;
@@ -27,6 +27,29 @@ function telemetryFromPoint(point = {}) {
         x: Number(point.x),
         y: Number(point.y),
     };
+}
+
+function sortedByRacePosition(racers) {
+    return [...racers].sort((a, b) => {
+        const aPosition = Number(a.racePosition);
+        const bPosition = Number(b.racePosition);
+        const aHasPosition = Number.isFinite(aPosition);
+        const bHasPosition = Number.isFinite(bPosition);
+
+        if (aHasPosition && bHasPosition) {
+            return aPosition - bPosition || a.name.localeCompare(b.name);
+        }
+
+        if (aHasPosition) {
+            return -1;
+        }
+
+        if (bHasPosition) {
+            return 1;
+        }
+
+        return (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name);
+    });
 }
 
 function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousTelemetry = [], baseTotals = {}) {
@@ -45,6 +68,7 @@ function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousT
         return {
             name,
             lap: incoming?.lap ?? previous?.lap ?? 0,
+            racePosition: incoming?.racePosition ?? previous?.racePosition ?? null,
             speed: previous?.speed ?? 0,
             brake: previous?.brake ?? 0,
             gear: previous?.gear ?? 1,
@@ -79,16 +103,44 @@ function realtimeDelay(drivers, pointIndex, nextPointIndex) {
     return Math.min(MAX_FRAME_DELAY_MS, Math.round((deltaSeconds * 1000) / REALTIME_PLAYBACK_RATE));
 }
 
-function topRacerCards(racers, currentLap = 0, allDriverNames = []) {
-    void currentLap;
-    void allDriverNames;
+function fallbackRacer(name, disabled = true) {
+    return {
+        name,
+        speed: 0,
+        brake: 0,
+        gear: 1,
+        throttle: 0,
+        total: 0,
+        racePosition: null,
+        disabled,
+    };
+}
 
-    return [...racers]
-        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name))
-        .slice(0, RACER_CARD_LIMIT)
-        .map((racer, index) => ({
-            ...racer,
-            position: index + 1,
+function selectedRacerCards(racers, currentLap = 0, allDriverNames = []) {
+    if (currentLap >= 46) {
+        return sortedByRacePosition(racers)
+            .slice(0, RACER_CARD_LIMIT)
+            .map((racer, index) => ({
+                ...racer,
+                position: racer.racePosition ?? index + 1,
+            }));
+    }
+
+    const telemetryByName = new Map(racers.map((racer) => [racer.name, racer]));
+    let startIndex = 0;
+
+    if (currentLap >= 30) {
+        startIndex = RACER_CARD_LIMIT * 2;
+    } else if (currentLap >= 16) {
+        startIndex = RACER_CARD_LIMIT;
+    }
+
+    return allDriverNames
+        .slice(startIndex, startIndex + RACER_CARD_LIMIT)
+        .map((name, index) => ({
+            ...fallbackRacer(name),
+            ...telemetryByName.get(name),
+            position: telemetryByName.get(name)?.racePosition ?? startIndex + index + 1,
         }));
 }
 
@@ -162,9 +214,9 @@ export default function RaceActionPage() {
     const [streamStarted, setStreamStarted] = useState(true);
     const [raceFinished, setRaceFinished] = useState(false);
     const [racerTelemetry, setRacerTelemetry] = useState([]);
-    const [predictionsByDriver, setPredictionsByDriver] = useState({});
     const [predictionCheckpoints, setPredictionCheckpoints] = useState({});
     const [predictionCheckpointLaps, setPredictionCheckpointLaps] = useState([]);
+    const [activePredictionLap, setActivePredictionLap] = useState(null);
     const [isClient, setIsClient] = useState(false);
     const driversRef = useRef(drivers);
 
@@ -236,12 +288,10 @@ export default function RaceActionPage() {
         fetch(`${API_URL}/predictions`)
             .then((response) => response.json())
             .then((data) => {
-                setPredictionsByDriver(predictionsFromRecords(data.drivers ?? []));
                 setPredictionCheckpoints(data.checkpoints ?? {});
                 setPredictionCheckpointLaps(data.checkpointLaps ?? []);
             })
             .catch(() => {
-                setPredictionsByDriver({});
                 setPredictionCheckpoints({});
                 setPredictionCheckpointLaps([]);
             });
@@ -378,6 +428,30 @@ export default function RaceActionPage() {
         };
     }, [streamStarted]);
 
+    const currentLap = racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0
+        ? racerTelemetry[0].lap
+        : 0;
+
+    useEffect(() => {
+        if (!predictionCheckpointLaps.length) {
+            setActivePredictionLap(null);
+            return;
+        }
+        if (currentLap <= 0) {
+            setActivePredictionLap(null);
+            return;
+        }
+
+        const nextPredictionLap = checkpointForLap(
+            currentLap,
+            predictionCheckpointLaps,
+        );
+
+        setActivePredictionLap((previousLap) => (
+            previousLap === nextPredictionLap ? previousLap : nextPredictionLap
+        ));
+    }, [currentLap, predictionCheckpointLaps]);
+
     const storedActiveBets = bettingMarkets
         .map((market, index) => ({
             market,
@@ -401,27 +475,15 @@ export default function RaceActionPage() {
     const hasOverUnderBet = Boolean(activeOverUnderBet);
     const hasAnyBets = activeBets.length > 0 || hasOverUnderBet;
     const raceIsRunning = (countdown === 0 || streamStarted) && !raceFinished;
-    const currentLap = racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0
-        ? racerTelemetry[0].lap
-        : 0;
-    const activePredictionLap = predictionCheckpointLaps.length
-        ? checkpointForLap(currentLap || predictionCheckpointLaps[0], predictionCheckpointLaps)
-        : null;
+    const activePredictionRecords = predictionCheckpoints[String(activePredictionLap)] ?? [];
     const activePredictionsByDriver = activePredictionLap
-        ? predictionsFromRecords(predictionCheckpoints[String(activePredictionLap)] ?? [])
-        : predictionsByDriver;
-    const racerCardDrivers = topRacerCards(
-        racerTelemetry.length > 0
-            ? racerTelemetry
-            : drivers.map((driver) => ({
-                name: driver,
-                speed: 0,
-                brake: 0,
-                gear: 1,
-                throttle: 0,
-                total: 0,
-                disabled: !streamStarted,
-            })),
+        ? predictionsFromRecords(activePredictionRecords)
+        : {};
+    const allRacerTelemetry = racerTelemetry.length > 0
+        ? racerTelemetry
+        : drivers.map((driver) => fallbackRacer(driver, !streamStarted));
+    const racerCardDrivers = selectedRacerCards(
+        allRacerTelemetry,
         currentLap,
         drivers
     );
@@ -444,16 +506,8 @@ export default function RaceActionPage() {
             </button>
             <RacePositionMap
                 racers={racerTelemetry.length > 0
-                    ? [...racerTelemetry].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))
-                    : drivers.map((driver) => ({
-                        name: driver,
-                        speed: 0,
-                        brake: 0,
-                        gear: 1,
-                        throttle: 0,
-                        total: 0,
-                        disabled: !streamStarted,
-                    }))}
+                    ? sortedByRacePosition(racerTelemetry)
+                    : drivers.map((driver) => fallbackRacer(driver, !streamStarted))}
                 limit={22}
                 driverCount={22}
             />
@@ -489,7 +543,7 @@ export default function RaceActionPage() {
                     <div className="active-bets-grid">
                         {activeBets.map((bet) => (
                             <BetPlacedCard
-                                key={`active-${bet.market}-${bet.index}`}
+                                key={`active-${bet.market}-${bet.index}-${activePredictionLap ?? 'final'}`}
                                 driver={bet.driver}
                                 betAmount={bet.wager}
                                 selected={bet.selected}

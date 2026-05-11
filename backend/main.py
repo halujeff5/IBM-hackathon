@@ -113,11 +113,13 @@ def serialize_driver_lap(
     lap_files: dict[str, dict[int, Path]],
 ) -> dict:
     completed_distance = cumulative_distance_before_lap(driver, lap_number, lap_files)
+    race_position = race_position_for_driver_lap(driver, lap_number)
 
     if lap_number not in lap_files.get(driver, {}):
         return {
             "name": driver,
             "lap": lap_number,
+            "racePosition": race_position,
             "active": False,
             "sourceFile": None,
             "completedDistance": completed_distance,
@@ -141,6 +143,7 @@ def serialize_driver_lap(
     return {
         "name": driver,
         "lap": lap_number,
+        "racePosition": race_position,
         "active": True,
         "sourceFile": lap_path(driver, lap_number, lap_files).name,
         "completedDistance": completed_distance,
@@ -159,6 +162,21 @@ def serialize_lap(lap_number: int) -> dict:
             for driver in drivers
         ],
     }
+
+
+@lru_cache(maxsize=1)
+def race_positions_by_lap_driver() -> dict[tuple[int, str], int]:
+    positions_df = load_all_laptimes_positions_csv()
+
+    return {
+        (int(row.lap), str(row.driver)): int(row.pos)
+        for row in positions_df.itertuples(index=False)
+        if pd.notnull(row.pos)
+    }
+
+
+def race_position_for_driver_lap(driver: str, lap_number: int) -> int | None:
+    return race_positions_by_lap_driver().get((lap_number, driver))
 
 
 @lru_cache(maxsize=1)
