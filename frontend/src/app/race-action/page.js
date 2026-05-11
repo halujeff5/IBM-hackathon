@@ -2,11 +2,74 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import TelemetryStream from "./TelemetryStream";
 import BetPlacedCard from "./BetPlacedCard";
 import CountdownCard from "../race/CountdownCard";
+import RacerCard from "./RacerCard";
+
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
+const BETTING_PAGE_ROUTE = "/race";
+const RACER_CARD_LIMIT = 22;
+
+function telemetryFromPoint(point = {}) {
+    return {
+        distance: Math.max(0, Number(point.distance) || 0),
+        speed: Math.max(0, Number(point.speed) || 0),
+        brake: Math.max(0, Number(point.brake) || 0),
+        gear: Math.max(0, Number(point.gear) || 0),
+        throttle: Math.max(0, Number(point.throttle) || 0),
+    };
+}
+
+function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousTelemetry = [], baseTotals = {}) {
+    const incomingByName = new Map(incomingDrivers.map((driver) => [driver.name, driver]));
+    const previousByName = new Map(previousTelemetry.map((driver) => [driver.name, driver]));
+
+    return driverNames.map((name) => {
+        const incoming = incomingByName.get(name);
+        const previous = previousByName.get(name);
+        const hasPoints = Boolean(incoming?.active !== false && incoming?.points?.length);
+        const point = hasPoints
+            ? incoming.points[Math.min(pointIndex, incoming.points.length - 1)]
+            : null;
+        const telemetry = point ? telemetryFromPoint(point) : {};
+
+        return {
+            name,
+            lap: incoming?.lap ?? previous?.lap ?? 0,
+            speed: previous?.speed ?? 0,
+            brake: previous?.brake ?? 0,
+            gear: previous?.gear ?? 1,
+            throttle: previous?.throttle ?? 0,
+            ...telemetry,
+            total: point
+                ? (baseTotals[name] ?? 0) + telemetry.distance
+                : previous?.total ?? 0,
+            disabled: !hasPoints,
+        };
+    });
+}
+
+function topRacerCards(racers) {
+    // Create a sorted ranking to assign positions
+    const sorted = [...racers]
+        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name));
+    
+    // Create a map of driver name to position
+    const positionMap = new Map(
+        sorted.map((racer, index) => [racer.name, index + 1])
+    );
+    
+    // Return first 8 drivers in their original order with updated positions
+    return racers
+        .slice(0, RACER_CARD_LIMIT)
+        .map((racer) => ({
+            ...racer,
+            position: positionMap.get(racer.name) ?? 0
+        }));
+}
 
 export default function RaceActionPage() {
     const router = useRouter();
@@ -20,10 +83,16 @@ export default function RaceActionPage() {
     const [overUnderSide, setOverUnderSide] = useState("");
     const [overUnderWager, setOverUnderWager] = useState("");
     const [placedOverUnderBet, setPlacedOverUnderBet] = useState(null);
-    const [countdown, setCountdown] = useState(120);
-    const [streamStarted, setStreamStarted] = useState(false);
+    const [countdown, setCountdown] = useState(0);
+    const [streamStarted, setStreamStarted] = useState(true);
     const [raceFinished, setRaceFinished] = useState(false);
+    const [racerTelemetry, setRacerTelemetry] = useState([]);
     const [isClient, setIsClient] = useState(false);
+    const driversRef = useRef(drivers);
+
+    useEffect(() => {
+        driversRef.current = drivers;
+    }, [drivers]);
 
     useEffect(() => {
         setIsClient(true);
@@ -45,9 +114,13 @@ export default function RaceActionPage() {
                 const elapsed = Math.floor((Date.now() - Number(savedTimestamp)) / 1000);
                 const remaining = Math.max(0, Number(saved) - elapsed);
                 setCountdown(remaining);
-                setStreamStarted(remaining === 0);
             }
-            
+
+            setCountdown(0);
+            setStreamStarted(true);
+            localStorage.setItem('countdown', '0');
+            localStorage.setItem('countdownTimestamp', String(Date.now()));
+
             if (storedSelectedBets) {
                 setSelectedBets(JSON.parse(storedSelectedBets));
             }
@@ -77,7 +150,6 @@ export default function RaceActionPage() {
             }
         }
 
-        const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
         fetch(`${API_URL}/`)
             .then((response) => response.json())
             .then((data) => setDrivers(data.drivers ?? []))
@@ -99,15 +171,114 @@ export default function RaceActionPage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Separate effect to manage stream start based on countdown
     useEffect(() => {
         if (countdown === 0 && !streamStarted) {
             setStreamStarted(true);
         } else if (countdown > 0 && streamStarted) {
-            // Reset stream if countdown is reset (e.g., from landing page)
             setStreamStarted(false);
         }
     }, [countdown, streamStarted]);
+
+    useEffect(() => {
+        if (!streamStarted) {
+            return;
+        }
+
+        const events = new EventSource(`${API_URL}/laps/stream`);
+        const queue = [];
+        let timer = null;
+        let animating = false;
+        let streamFinished = false;
+        let latestRacerTelemetry = [];
+
+        function playNextLap() {
+            const incoming = queue.shift();
+            if (!incoming || streamFinished) {
+                animating = false;
+                return;
+            }
+
+            animating = true;
+            const driverNames = driversRef.current.length
+                ? driversRef.current
+                : incoming.drivers.map((driver) => driver.name);
+            const baseTotals = Object.fromEntries(
+                latestRacerTelemetry.map((driver) => [driver.name, driver.total ?? 0]),
+            );
+            const maxPoints = Math.max(
+                1,
+                ...incoming.drivers.map((driver) => driver.points.length),
+            );
+            let pointIndex = 0;
+
+            timer = setInterval(() => {
+                setRacerTelemetry((currentTelemetry) => {
+                    const nextTelemetry = buildRacerTelemetry(
+                        driverNames,
+                        incoming.drivers,
+                        pointIndex,
+                        currentTelemetry,
+                        baseTotals,
+                    );
+
+                    latestRacerTelemetry = nextTelemetry;
+
+                    return nextTelemetry;
+                });
+
+                pointIndex += 8;
+
+                if (pointIndex >= maxPoints) {
+                    clearInterval(timer);
+                    setRacerTelemetry((currentTelemetry) => {
+                        const nextTelemetry = buildRacerTelemetry(
+                            driverNames,
+                            incoming.drivers,
+                            maxPoints,
+                            currentTelemetry,
+                            baseTotals,
+                        );
+
+                        latestRacerTelemetry = nextTelemetry;
+
+                        return nextTelemetry;
+                    });
+
+                    if (incoming.lap === 57) {
+                        streamFinished = true;
+                        queue.length = 0;
+                        events.close();
+                        animating = false;
+                        return;
+                    }
+
+                    playNextLap();
+                }
+            }, 20);
+        }
+
+        events.onmessage = (event) => {
+            if (streamFinished) {
+                events.close();
+                return;
+            }
+
+            queue.push(JSON.parse(event.data));
+
+            if (!animating) {
+                playNextLap();
+            }
+        };
+
+        events.onerror = () => {
+            events.close();
+        };
+
+        return () => {
+            events.close();
+            clearInterval(timer);
+        };
+    }, [streamStarted]);
 
     const storedActiveBets = bettingMarkets
         .map((market, index) => ({
@@ -132,6 +303,19 @@ export default function RaceActionPage() {
     const hasOverUnderBet = Boolean(activeOverUnderBet);
     const hasAnyBets = activeBets.length > 0 || hasOverUnderBet;
     const raceIsRunning = (countdown === 0 || streamStarted) && !raceFinished;
+    const racerCardDrivers = topRacerCards(
+        racerTelemetry.length > 0
+            ? racerTelemetry
+            : drivers.map((driver) => ({
+                name: driver,
+                speed: 0,
+                brake: 0,
+                gear: 1,
+                throttle: 0,
+                total: 0,
+                disabled: !streamStarted,
+            })),
+    );
 
     if (!isClient) {
         return <main className="race-action-page" />;
@@ -143,7 +327,7 @@ export default function RaceActionPage() {
             <button
                 className={`proceed-to-race-button ${raceIsRunning ? 'proceed-to-race-button-dimmed' : ''}`}
                 type="button"
-                onClick={() => router.push('/race')}
+                onClick={() => router.push(BETTING_PAGE_ROUTE)}
                 disabled={raceIsRunning}
                 style={{ marginBottom: '20px' }}
             >
@@ -179,6 +363,32 @@ export default function RaceActionPage() {
                 shouldStart={streamStarted}
                 onRaceFinished={() => setRaceFinished(true)}
             />
+            {racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0 && (
+                <div style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    marginBottom: '16px',
+                    color: '#14171a',
+                    fontFamily: '"Formula1 Display Bold", "Arial Black", Impact, sans-serif',
+                }}>
+                    Lap {racerTelemetry[0].lap} / 57
+                </div>
+            )}
+            <section className="racer-card-grid">
+                {racerCardDrivers.map((driver) => (
+                    <RacerCard
+                        key={driver.name}
+                        position={driver.position}
+                        name={driver.name}
+                        speed={driver.speed}
+                        brake={driver.brake}
+                        gear={driver.gear}
+                        throttle={driver.throttle}
+                        disabled={driver.disabled}
+                        raceFinished={raceFinished}
+                    />
+                ))}
+            </section>
         </main>
     )
 }
