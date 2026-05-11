@@ -37,9 +37,16 @@ function clampRaceDistance(distance) {
 
 function lapDistance(points) {
   return points.reduce(
-    (maxDistance, point) => Math.max(maxDistance, Number(point.distance) || 0),
+    (maxDistance, point) => Math.max(
+      maxDistance,
+      Number(point.raceDistance ?? point.distance) || 0,
+    ),
     0,
   );
+}
+
+function pointRaceDistance(point, fallbackTotal = 0) {
+  return clampRaceDistance(Number(point?.raceDistance ?? fallbackTotal) || 0);
 }
 
 function mergeDriverRows(currentData, incomingDrivers) {
@@ -181,7 +188,8 @@ export default function AccumulatingStream({ shouldStart = true, onRaceFinished 
             return {
               ...driver,
               lap: incoming.lap,
-              total: clampRaceDistance(
+              total: pointRaceDistance(
+                point,
                 baseTotals[driver.name] + Math.max(0, Number(point.distance) || 0),
               ),
             };
@@ -207,9 +215,7 @@ export default function AccumulatingStream({ shouldStart = true, onRaceFinished 
               return {
                 ...driver,
                 lap: incoming.lap,
-                total: clampRaceDistance(
-                  baseTotals[driver.name] + lapDistance(driverLap.points),
-                ),
+                total: lapDistance(driverLap.points),
               };
             });
 

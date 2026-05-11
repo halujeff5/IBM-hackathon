@@ -2,8 +2,10 @@ import asyncio
 import json
 import pickle
 import re
+from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,15 +15,31 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LAP_DATA_DIR = PROJECT_ROOT / "data" / "allData"
+PREDICTION_DATA_DIR = PROJECT_ROOT / "data" / "predictionData"
+PREDICTION_MODEL_PATH = PROJECT_ROOT / "backend" / "models" / "xgb_ranker_last_10_laps.pkl"
+ALL_LAPTIMES_POSITIONS_CSV = PREDICTION_DATA_DIR / "all_laptimes_positions.csv"
 LAP_COUNT = 57
 TELEMETRY_COLUMNS = ["time", "distance", "speed", "brake", "gear", "throttle", "x", "y"]
 LAP_FILE_PATTERN = re.compile(r"^([A-Z]{3})lap(\d+)\.pkl$")
+PREDICTION_SIMULATION_COUNT = 10_000
+PREDICTION_TOP_N = 5
+PREDICTION_CHECKPOINT_LAPS = [10, 20, 30, 40, 50, 52, 54, 56, 57]
+POSITIONS_CSV_COLUMNS = [
+    "driver",
+    "lap",
+    "pos",
+    "life",
+    "compound",
+    "time",
+    "avg_prev_3_time",
+    "pace_delta",
+]
 
 
 def discover_lap_files() -> dict[str, dict[int, Path]]:
@@ -53,13 +71,40 @@ def lap_path(
     return (lap_files if lap_files is not None else discover_lap_files())[driver_prefix][lap_number]
 
 
+@lru_cache(maxsize=None)
+def load_lap_file(path: str) -> pd.DataFrame:
+    with Path(path).open("rb") as f:
+        return pickle.load(f)
+
+
 def load_lap(
     driver: str,
     lap_number: int,
     lap_files: dict[str, dict[int, Path]] | None = None,
 ) -> pd.DataFrame:
-    with lap_path(driver, lap_number, lap_files).open("rb") as f:
-        return pickle.load(f)
+    return load_lap_file(str(lap_path(driver, lap_number, lap_files)))
+
+
+@lru_cache(maxsize=None)
+def lap_distance_from_file(path: str) -> float:
+    lap_data = load_lap_file(path)
+
+    if "distance" not in lap_data.columns:
+        return 0.0
+
+    return float(pd.to_numeric(lap_data["distance"], errors="coerce").max() or 0)
+
+
+def cumulative_distance_before_lap(
+    driver: str,
+    lap_number: int,
+    lap_files: dict[str, dict[int, Path]],
+) -> float:
+    return sum(
+        lap_distance_from_file(str(lap_files[driver][previous_lap]))
+        for previous_lap in range(1, lap_number)
+        if previous_lap in lap_files.get(driver, {})
+    )
 
 
 def serialize_driver_lap(
@@ -67,12 +112,15 @@ def serialize_driver_lap(
     lap_number: int,
     lap_files: dict[str, dict[int, Path]],
 ) -> dict:
+    completed_distance = cumulative_distance_before_lap(driver, lap_number, lap_files)
+
     if lap_number not in lap_files.get(driver, {}):
         return {
             "name": driver,
             "lap": lap_number,
             "active": False,
             "sourceFile": None,
+            "completedDistance": completed_distance,
             "points": [],
         }
 
@@ -84,12 +132,18 @@ def serialize_driver_lap(
         pd.notnull(lap_data[telemetry_columns]),
         None,
     )
+    if "distance" in telemetry.columns:
+        telemetry["raceDistance"] = (
+            pd.to_numeric(telemetry["distance"], errors="coerce").fillna(0).clip(lower=0)
+            + completed_distance
+        )
 
     return {
         "name": driver,
         "lap": lap_number,
         "active": True,
         "sourceFile": lap_path(driver, lap_number, lap_files).name,
+        "completedDistance": completed_distance,
         "points": telemetry.to_dict(orient="records"),
     }
 
@@ -107,6 +161,166 @@ def serialize_lap(lap_number: int) -> dict:
     }
 
 
+@lru_cache(maxsize=1)
+def load_ranker_model():
+    with PREDICTION_MODEL_PATH.open("rb") as f:
+        return pickle.load(f)
+
+
+def ranker_feature_frame(pace_df: pd.DataFrame, feature_names: list[str]) -> pd.DataFrame:
+    features = pd.DataFrame(index=pace_df.index)
+
+    for feature_name in feature_names:
+        if feature_name.startswith("drv_"):
+            features[feature_name] = (
+                pace_df["driver"].astype(str) == feature_name.removeprefix("drv_")
+            ).astype(int)
+        elif feature_name.startswith("compound_"):
+            features[feature_name] = (
+                pace_df["compound"].astype(str) == feature_name.removeprefix("compound_")
+            ).astype(int)
+        else:
+            features[feature_name] = pd.to_numeric(
+                pace_df.get(feature_name),
+                errors="coerce",
+            )
+
+    return features.fillna(0)
+
+
+def normalize_positions_dataframe(positions_df: pd.DataFrame) -> pd.DataFrame:
+    missing_columns = [
+        column for column in POSITIONS_CSV_COLUMNS if column not in positions_df.columns
+    ]
+    if missing_columns:
+        raise ValueError(
+            f"{ALL_LAPTIMES_POSITIONS_CSV} is missing columns: {missing_columns}"
+        )
+
+    return (
+        positions_df[POSITIONS_CSV_COLUMNS]
+        .sort_values(["lap", "pos", "driver"])
+        .reset_index(drop=True)
+    )
+
+
+def load_all_laptimes_positions_csv() -> pd.DataFrame:
+    if not ALL_LAPTIMES_POSITIONS_CSV.exists():
+        raise FileNotFoundError(
+            f"Prediction CSV not found: {ALL_LAPTIMES_POSITIONS_CSV}"
+        )
+
+    positions_df = normalize_positions_dataframe(pd.read_csv(ALL_LAPTIMES_POSITIONS_CSV))
+    positions_df["lap"] = pd.to_numeric(positions_df["lap"], errors="coerce")
+    positions_df["pos"] = pd.to_numeric(positions_df["pos"], errors="coerce")
+    positions_df["time"] = pd.to_numeric(positions_df["time"], errors="coerce")
+    positions_df["life"] = pd.to_numeric(positions_df["life"], errors="coerce")
+    positions_df["avg_prev_3_time"] = pd.to_numeric(
+        positions_df["avg_prev_3_time"],
+        errors="coerce",
+    )
+    positions_df["pace_delta"] = pd.to_numeric(
+        positions_df["pace_delta"],
+        errors="coerce",
+    )
+
+    return positions_df.dropna(subset=["driver", "lap", "time"]).reset_index(drop=True)
+
+
+def predict_rank_probability_with_model(
+    positions_df: pd.DataFrame,
+    n_sims: int = PREDICTION_SIMULATION_COUNT,
+    seed: int = 42,
+    input_lap_count: int = 10,
+    target_lap: int | None = None,
+) -> pd.DataFrame:
+    model = load_ranker_model()
+    feature_names = list(model.feature_names_in_)
+    pace_df = positions_df.copy()
+    if target_lap is not None:
+        pace_df = pace_df[pace_df["lap"] <= target_lap]
+
+    recent_laps = (
+        pace_df
+        .sort_values(["driver", "lap"])
+        .groupby("driver", group_keys=False)
+        .tail(input_lap_count)
+        .copy()
+    )
+
+    if recent_laps.empty:
+        raise ValueError("No laptimes available for ranker prediction.")
+
+    features = ranker_feature_frame(recent_laps, feature_names)
+    recent_laps["rank_score"] = model.predict(features)
+
+    driver_scores = (
+        recent_laps
+        .groupby("driver")["rank_score"]
+        .mean()
+        .sort_index()
+    )
+    drivers = driver_scores.index.to_numpy()
+    scores = driver_scores.to_numpy(dtype=float)
+
+    rng = np.random.default_rng(seed + int(target_lap or 0))
+    sampled_scores = scores[None, :] + rng.gumbel(
+        loc=0,
+        scale=1,
+        size=(n_sims, len(drivers)),
+    )
+    order = np.argsort(-sampled_scores, axis=1)
+    ranks = np.empty_like(order)
+    for sim_idx in range(n_sims):
+        ranks[sim_idx, order[sim_idx]] = np.arange(1, len(drivers) + 1)
+
+    rank_probability = pd.DataFrame({"driver": drivers})
+    rank_probability["rank_score"] = scores
+    rank_probability["win_prob"] = (ranks == 1).mean(axis=0)
+    rank_probability["second_prob"] = (ranks == 2).mean(axis=0)
+    rank_probability["third_prob"] = (ranks == 3).mean(axis=0)
+    rank_probability["top_3_prob"] = (ranks <= 3).mean(axis=0)
+    rank_probability[f"top_{PREDICTION_TOP_N}_prob"] = (
+        ranks <= PREDICTION_TOP_N
+    ).mean(axis=0)
+    rank_probability["expected_finish"] = ranks.mean(axis=0)
+
+    return (
+        rank_probability
+        .sort_values(["expected_finish", "driver"])
+        .reset_index(drop=True)
+    )
+
+
+def fetch_rank_probability() -> pd.DataFrame:
+    return predict_rank_probability_with_model(load_all_laptimes_positions_csv())
+
+
+def fetch_rank_probability_for_lap(lap_number: int) -> pd.DataFrame:
+    return predict_rank_probability_with_model(
+        load_all_laptimes_positions_csv(),
+        target_lap=lap_number,
+    )
+
+
+def fetch_rank_probability_checkpoints() -> dict[int, pd.DataFrame]:
+    positions_df = load_all_laptimes_positions_csv()
+
+    return {
+        lap_number: predict_rank_probability_with_model(
+            positions_df,
+            target_lap=lap_number,
+        )
+        for lap_number in PREDICTION_CHECKPOINT_LAPS
+    }
+
+
+def serialize_rank_probability(rank_probability: pd.DataFrame) -> list[dict]:
+    return rank_probability.where(pd.notnull(rank_probability), None).to_dict(
+        orient="records"
+    )
+
+
 @app.get("/")
 async def fetch_race():
     lap_files = discover_lap_files()
@@ -115,6 +329,7 @@ async def fetch_race():
         "laps": LAP_COUNT,
         "drivers": discover_drivers(lap_files),
         "streamUrl": "/laps/stream",
+        "predictionStreamUrl": "/predictions/stream",
     }
 
 
@@ -156,3 +371,62 @@ async def fetch_lap_metadata():
 @app.get("/laps/{lap_number}")
 async def fetch_lap(lap_number: int):
     return serialize_lap(lap_number)
+
+
+@app.get("/predictions")
+async def fetch_predictions():
+    checkpoint_probabilities = await asyncio.to_thread(fetch_rank_probability_checkpoints)
+    final_lap = PREDICTION_CHECKPOINT_LAPS[-1]
+
+    return {
+        "source": str(ALL_LAPTIMES_POSITIONS_CSV),
+        "sourceType": "all_laptimes_positions_csv",
+        "model": str(PREDICTION_MODEL_PATH),
+        "simulations": PREDICTION_SIMULATION_COUNT,
+        "checkpointLaps": PREDICTION_CHECKPOINT_LAPS,
+        "csv": str(ALL_LAPTIMES_POSITIONS_CSV),
+        "drivers": serialize_rank_probability(checkpoint_probabilities[final_lap]),
+        "checkpoints": {
+            str(lap_number): serialize_rank_probability(rank_probability)
+            for lap_number, rank_probability in checkpoint_probabilities.items()
+        },
+    }
+
+
+@app.get("/predictions/{lap_number}")
+async def fetch_predictions_for_lap(lap_number: int):
+    rank_probability = await asyncio.to_thread(fetch_rank_probability_for_lap, lap_number)
+
+    return {
+        "source": str(ALL_LAPTIMES_POSITIONS_CSV),
+        "sourceType": "all_laptimes_positions_csv",
+        "model": str(PREDICTION_MODEL_PATH),
+        "lap": lap_number,
+        "simulations": PREDICTION_SIMULATION_COUNT,
+        "drivers": serialize_rank_probability(rank_probability),
+    }
+
+
+@app.post("/predictions/all-laptimes-positions-csv")
+async def write_all_laptimes_positions_csv():
+    positions_df = await asyncio.to_thread(load_all_laptimes_positions_csv)
+
+    return {
+        "csv": str(ALL_LAPTIMES_POSITIONS_CSV),
+        "rows": len(positions_df),
+        "columns": POSITIONS_CSV_COLUMNS,
+    }
+
+
+@app.get("/predictions/stream")
+async def stream_predictions():
+    async def generate():
+        rank_probability = await asyncio.to_thread(fetch_rank_probability)
+
+        for record in serialize_rank_probability(rank_probability):
+            yield f"data: {json.dumps(record)}\n\n"
+            await asyncio.sleep(0.15)
+
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")

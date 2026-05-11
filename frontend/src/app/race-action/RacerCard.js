@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Card, Typography } from '@mui/material';
 import CompositionExample from './SpeedGauge';
 import ThrottleExample from './ThrottleGauge';
@@ -6,6 +6,20 @@ import ThrottleExample from './ThrottleGauge';
 export default function RacerCard({ position, name = 'LEC', speed = 0, brake = 0, gear = 1, throttle = 0, rpm = 0, disabled = false, raceFinished = false }) {
   const roundedSpeed = Math.round(Number(speed) || 0);
   const roundedThrottle = Math.round(Number(throttle) || 0);
+  const [driverImageUrl, setDriverImageUrl] = useState('');
+
+  useEffect(() => {
+    // Load driver data and find matching driver
+    fetch('/drivers.json')
+      .then(res => res.json())
+      .then(data => {
+        const driver = data.drivers.find(d => d.driver === name);
+        if (driver) {
+          setDriverImageUrl(driver.url);
+        }
+      })
+      .catch(err => console.error('Error loading driver data:', err));
+  }, [name]);
 
   // Determine border color based on position (only show at end of race)
   const getBorderColor = () => {
@@ -46,12 +60,16 @@ export default function RacerCard({ position, name = 'LEC', speed = 0, brake = 0
         }}
       >
         <Box
-          aria-label="Driver jpg placeholder"
+          aria-label="Driver headshot"
           sx={{
             minWidth: 120,
             aspectRatio: '1',
             alignSelf: 'stretch',
             backgroundColor: '#9ca3af',
+            backgroundImage: driverImageUrl ? `url(${driverImageUrl})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           }}
         />
       <Box

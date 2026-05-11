@@ -19,6 +19,7 @@ const MAX_FRAME_DELAY_MS = 1200;
 function telemetryFromPoint(point = {}) {
     return {
         distance: Math.max(0, Number(point.distance) || 0),
+        raceDistance: Math.max(0, Number(point.raceDistance) || 0),
         speed: Math.max(0, Number(point.speed) || 0),
         brake: Math.max(0, Number(point.brake) || 0),
         gear: Math.max(0, Number(point.gear) || 0),
@@ -50,7 +51,7 @@ function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousT
             throttle: previous?.throttle ?? 0,
             ...telemetry,
             total: point
-                ? (baseTotals[name] ?? 0) + telemetry.distance
+                ? telemetry.raceDistance || (baseTotals[name] ?? 0) + telemetry.distance
                 : previous?.total ?? 0,
             disabled: !hasPoints,
         };
@@ -78,16 +79,71 @@ function realtimeDelay(drivers, pointIndex, nextPointIndex) {
     return Math.min(MAX_FRAME_DELAY_MS, Math.round((deltaSeconds * 1000) / REALTIME_PLAYBACK_RATE));
 }
 
-function topRacerCards(racers) {
-    const sorted = [...racers]
-        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name));
+function topRacerCards(racers, currentLap = 0, allDriverNames = []) {
+    void currentLap;
+    void allDriverNames;
 
-    return sorted
+    return [...racers]
+        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name))
         .slice(0, RACER_CARD_LIMIT)
         .map((racer, index) => ({
             ...racer,
-            position: index + 1
+            position: index + 1,
         }));
+}
+
+function predictionForMarket(market, driver, predictionsByDriver) {
+    const prediction = predictionsByDriver[driver];
+
+    if (!prediction) {
+        return {};
+    }
+
+    if (market === "Race Winner") {
+        return { probabilityLabel: "Win Prob", probabilityValue: prediction.win_prob };
+    }
+
+    if (market === "Top 3 Finish") {
+        return { probabilityLabel: "Top 3 Prob", probabilityValue: prediction.top_3_prob };
+    }
+
+    if (market === "Top 5 Finish") {
+        return { probabilityLabel: "Top 5 Prob", probabilityValue: prediction.top_5_prob };
+    }
+
+    if (market === "2nd Place") {
+        return { probabilityLabel: "2nd Prob", probabilityValue: prediction.second_prob };
+    }
+
+    if (market === "3rd Place") {
+        return { probabilityLabel: "3rd Prob", probabilityValue: prediction.third_prob };
+    }
+
+    return {};
+}
+
+function predictionsFromRecords(records = []) {
+    return Object.fromEntries(
+        records.map((driver) => [
+            driver.driver,
+            {
+                win_prob: Number(driver.win_prob),
+                top_3_prob: Number(driver.top_3_prob),
+                top_5_prob: Number(driver.top_5_prob),
+                second_prob: Number(driver.second_prob),
+                third_prob: Number(driver.third_prob),
+            },
+        ]),
+    );
+}
+
+function checkpointForLap(currentLap, checkpointLaps) {
+    const sortedLaps = checkpointLaps
+        .map(Number)
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b);
+
+    return sortedLaps.filter((lap) => lap <= currentLap).at(-1) ?? sortedLaps[0];
 }
 
 export default function RaceActionPage() {
@@ -106,6 +162,9 @@ export default function RaceActionPage() {
     const [streamStarted, setStreamStarted] = useState(true);
     const [raceFinished, setRaceFinished] = useState(false);
     const [racerTelemetry, setRacerTelemetry] = useState([]);
+    const [predictionsByDriver, setPredictionsByDriver] = useState({});
+    const [predictionCheckpoints, setPredictionCheckpoints] = useState({});
+    const [predictionCheckpointLaps, setPredictionCheckpointLaps] = useState([]);
     const [isClient, setIsClient] = useState(false);
     const driversRef = useRef(drivers);
 
@@ -173,6 +232,19 @@ export default function RaceActionPage() {
             .then((response) => response.json())
             .then((data) => setDrivers(data.drivers ?? []))
             .catch(() => setDrivers([]));
+
+        fetch(`${API_URL}/predictions`)
+            .then((response) => response.json())
+            .then((data) => {
+                setPredictionsByDriver(predictionsFromRecords(data.drivers ?? []));
+                setPredictionCheckpoints(data.checkpoints ?? {});
+                setPredictionCheckpointLaps(data.checkpointLaps ?? []);
+            })
+            .catch(() => {
+                setPredictionsByDriver({});
+                setPredictionCheckpoints({});
+                setPredictionCheckpointLaps([]);
+            });
     }, []);
 
     useEffect(() => {
@@ -266,6 +338,7 @@ export default function RaceActionPage() {
                         streamFinished = true;
                         queue.length = 0;
                         events.close();
+                        setRaceFinished(true);
                         animating = false;
                         return;
                     }
@@ -328,6 +401,15 @@ export default function RaceActionPage() {
     const hasOverUnderBet = Boolean(activeOverUnderBet);
     const hasAnyBets = activeBets.length > 0 || hasOverUnderBet;
     const raceIsRunning = (countdown === 0 || streamStarted) && !raceFinished;
+    const currentLap = racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0
+        ? racerTelemetry[0].lap
+        : 0;
+    const activePredictionLap = predictionCheckpointLaps.length
+        ? checkpointForLap(currentLap || predictionCheckpointLaps[0], predictionCheckpointLaps)
+        : null;
+    const activePredictionsByDriver = activePredictionLap
+        ? predictionsFromRecords(predictionCheckpoints[String(activePredictionLap)] ?? [])
+        : predictionsByDriver;
     const racerCardDrivers = topRacerCards(
         racerTelemetry.length > 0
             ? racerTelemetry
@@ -340,6 +422,8 @@ export default function RaceActionPage() {
                 total: 0,
                 disabled: !streamStarted,
             })),
+        currentLap,
+        drivers
     );
 
     if (!isClient) {
@@ -353,37 +437,11 @@ export default function RaceActionPage() {
                 className={`proceed-to-race-button ${raceIsRunning ? 'proceed-to-race-button-dimmed' : ''}`}
                 type="button"
                 onClick={() => router.push(BETTING_PAGE_ROUTE)}
-                disabled={raceIsRunning}
+                disabled={raceIsRunning && !raceFinished}
                 style={{ marginBottom: '20px' }}
             >
                 Return to Bets
             </button>
-            {hasAnyBets && (
-                <aside className="active-bets-sidebar">
-                    <h2 className="active-bets-title">Active Bets</h2>
-                    <div className="active-bets-grid">
-                        {activeBets.map((bet) => (
-                            <BetPlacedCard
-                                key={`active-${bet.market}-${bet.index}`}
-                                driver={bet.driver}
-                                betAmount={bet.wager}
-                                selected={bet.selected}
-                                bettingMarket={bet.market}
-                            />
-                        ))}
-                        {hasOverUnderBet && (
-                            <BetPlacedCard
-                                key="active-over-under"
-                                driver={activeOverUnderBet.driver}
-                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
-                                selected={true}
-                                bettingMarket={activeOverUnderBet.bettingMarket}
-                                overUnder={activeOverUnderBet.overUnder}
-                            />
-                        )}
-                    </div>
-                </aside>
-            )}
             <RacePositionMap
                 racers={racerTelemetry.length > 0
                     ? [...racerTelemetry].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))
@@ -425,6 +483,37 @@ export default function RaceActionPage() {
                     />
                 ))}
             </section>
+            {hasAnyBets && (
+                <aside className="active-bets-sidebar">
+                    <h2 className="active-bets-title">Active Bets</h2>
+                    <div className="active-bets-grid">
+                        {activeBets.map((bet) => (
+                            <BetPlacedCard
+                                key={`active-${bet.market}-${bet.index}`}
+                                driver={bet.driver}
+                                betAmount={bet.wager}
+                                selected={bet.selected}
+                                bettingMarket={bet.market}
+                                {...predictionForMarket(
+                                    bet.market,
+                                    bet.driver,
+                                    activePredictionsByDriver,
+                                )}
+                            />
+                        ))}
+                        {hasOverUnderBet && (
+                            <BetPlacedCard
+                                key="active-over-under"
+                                driver={activeOverUnderBet.driver}
+                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
+                                selected={true}
+                                bettingMarket={activeOverUnderBet.bettingMarket}
+                                overUnder={activeOverUnderBet.overUnder}
+                            />
+                        )}
+                    </div>
+                </aside>
+            )}
         </main>
     )
 }

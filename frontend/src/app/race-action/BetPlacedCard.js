@@ -8,7 +8,11 @@ export default function BetPlacedCard({
   selected,
   bettingMarket,
   overUnder,
+  probabilityLabel,
+  probabilityValue,
 }) {
+  const hasProbability = Number.isFinite(probabilityValue);
+
   return (
     <div className={`race-card bet-placed-card ${selected ? 'race-card-selected' : ''}`}>
       {bettingMarket && <span className="bet-placed-market">{bettingMarket}</span>}
@@ -18,6 +22,11 @@ export default function BetPlacedCard({
       {overUnder && (
         <div className="bet-placed-info">
           {overUnder}
+        </div>
+      )}
+      {hasProbability && (
+        <div className="bet-placed-info">
+          {probabilityLabel}: {(probabilityValue * 100).toFixed(1)}%
         </div>
       )}
       <div className="bet-placed-amount">
