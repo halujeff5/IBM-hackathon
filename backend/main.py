@@ -24,6 +24,10 @@ LAP_DATA_DIR = PROJECT_ROOT / "data" / "allData"
 PREDICTION_DATA_DIR = PROJECT_ROOT / "data" / "predictionData"
 PREDICTION_MODEL_PATH = PROJECT_ROOT / "backend" / "models" / "xgb_ranker_last_10_laps.pkl"
 ALL_LAPTIMES_POSITIONS_CSV = PREDICTION_DATA_DIR / "all_laptimes_positions.csv"
+DRIVER_LAP_LAST_TIME_CSV = (
+    Path("/Users/jeffreyng/desktop/2026-F1-racing-IBM")
+    / "driver_lap_last_time.csv"
+)
 LAP_COUNT = 57
 TELEMETRY_COLUMNS = ["time", "distance", "speed", "brake", "gear", "throttle", "x", "y"]
 LAP_FILE_PATTERN = re.compile(r"^([A-Z]{3})lap(\d+)\.pkl$")
@@ -114,12 +118,14 @@ def serialize_driver_lap(
 ) -> dict:
     completed_distance = cumulative_distance_before_lap(driver, lap_number, lap_files)
     race_position = race_position_for_driver_lap(driver, lap_number)
+    race_gap_seconds = race_gap_for_driver_lap(driver, lap_number)
 
     if lap_number not in lap_files.get(driver, {}):
         return {
             "name": driver,
             "lap": lap_number,
             "racePosition": race_position,
+            "raceGapSeconds": race_gap_seconds,
             "active": False,
             "sourceFile": None,
             "completedDistance": completed_distance,
@@ -144,6 +150,7 @@ def serialize_driver_lap(
         "name": driver,
         "lap": lap_number,
         "racePosition": race_position,
+        "raceGapSeconds": race_gap_seconds,
         "active": True,
         "sourceFile": lap_path(driver, lap_number, lap_files).name,
         "completedDistance": completed_distance,
@@ -177,6 +184,40 @@ def race_positions_by_lap_driver() -> dict[tuple[int, str], int]:
 
 def race_position_for_driver_lap(driver: str, lap_number: int) -> int | None:
     return race_positions_by_lap_driver().get((lap_number, driver))
+
+
+@lru_cache(maxsize=1)
+def race_gaps_by_lap_driver() -> dict[tuple[int, str], float]:
+    if not DRIVER_LAP_LAST_TIME_CSV.exists():
+        return {}
+
+    timing_df = pd.read_csv(DRIVER_LAP_LAST_TIME_CSV)
+    required_columns = {"driver", "lap", "last_time"}
+    if not required_columns.issubset(timing_df.columns):
+        return {}
+
+    timing_df = timing_df[["driver", "lap", "last_time"]].copy()
+    timing_df["driver"] = timing_df["driver"].astype(str)
+    timing_df["lap"] = pd.to_numeric(timing_df["lap"], errors="coerce")
+    timing_df["last_time"] = pd.to_numeric(timing_df["last_time"], errors="coerce")
+    timing_df = timing_df.dropna(subset=["driver", "lap", "last_time"])
+    timing_df = timing_df.sort_values(["driver", "lap"])
+    timing_df["elapsed_time"] = timing_df.groupby("driver")["last_time"].cumsum()
+    timing_df["leader_elapsed_time"] = timing_df.groupby("lap")[
+        "elapsed_time"
+    ].transform("min")
+    timing_df["gap_seconds"] = (
+        timing_df["elapsed_time"] - timing_df["leader_elapsed_time"]
+    )
+
+    return {
+        (int(row.lap), str(row.driver)): round(float(row.gap_seconds), 3)
+        for row in timing_df.itertuples(index=False)
+    }
+
+
+def race_gap_for_driver_lap(driver: str, lap_number: int) -> float | None:
+    return race_gaps_by_lap_driver().get((lap_number, driver))
 
 
 @lru_cache(maxsize=1)

@@ -44,6 +44,20 @@ function projectPoint(x, y) {
   };
 }
 
+function formatGap(gapSeconds) {
+  const gap = Number(gapSeconds);
+
+  if (!Number.isFinite(gap)) {
+    return "";
+  }
+
+  if (Math.abs(gap) < 0.001) {
+    return "Leader";
+  }
+
+  return `+${gap.toFixed(3)}s`;
+}
+
 export default function RacePositionMap({ racers = [], limit = 8, driverCount = 0 }) {
   const visibleRacers = useMemo(
     () => racers.filter(hasCoordinate).slice(0, 8),
@@ -66,7 +80,14 @@ export default function RacePositionMap({ racers = [], limit = 8, driverCount = 
                 className="race-position-rank-swatch"
                 style={{ backgroundColor: index < 8 ? DRIVER_COLORS[index % DRIVER_COLORS.length] : '#808080' }}
               />
-              <strong>{driver.name}</strong>
+              <span className="race-position-driver-info">
+                <strong>{driver.name}</strong>
+                {formatGap(driver.raceGapSeconds) && (
+                  <span className="race-position-gap">
+                    {formatGap(driver.raceGapSeconds)}
+                  </span>
+                )}
+              </span>
             </div>
           ))}
         </aside>

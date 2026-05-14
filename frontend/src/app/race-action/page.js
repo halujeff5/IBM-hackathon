@@ -69,6 +69,7 @@ function buildRacerTelemetry(driverNames, incomingDrivers, pointIndex, previousT
             name,
             lap: incoming?.lap ?? previous?.lap ?? 0,
             racePosition: incoming?.racePosition ?? previous?.racePosition ?? null,
+            raceGapSeconds: incoming?.raceGapSeconds ?? previous?.raceGapSeconds ?? null,
             speed: previous?.speed ?? 0,
             brake: previous?.brake ?? 0,
             gear: previous?.gear ?? 1,
@@ -112,6 +113,7 @@ function fallbackRacer(name, disabled = true) {
         throttle: 0,
         total: 0,
         racePosition: null,
+        raceGapSeconds: null,
         disabled,
     };
 }
