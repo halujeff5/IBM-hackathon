@@ -15,6 +15,9 @@ const RACER_CARD_LIMIT = 6;
 const POINT_STEP = 8;
 const REALTIME_PLAYBACK_RATE = 20;
 const MAX_FRAME_DELAY_MS = 1200;
+const RACE_ENGINE_SOUND = "/sounds/f1engine.opus";
+const RACE_ENGINE_TRIM_START_SECONDS = 0.5;
+const RACE_ENGINE_TRIM_END_SECONDS = 1.5;
 
 function telemetryFromPoint(point = {}) {
     return {
@@ -219,12 +222,58 @@ export default function RaceActionPage() {
     const [predictionCheckpoints, setPredictionCheckpoints] = useState({});
     const [predictionCheckpointLaps, setPredictionCheckpointLaps] = useState([]);
     const [activePredictionLap, setActivePredictionLap] = useState(null);
+    const [engineSoundEnabled, setEngineSoundEnabled] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const driversRef = useRef(drivers);
+    const raceAudioRef = useRef(null);
+    const raceAudioLoopStartRef = useRef(0);
+    const raceAudioLoopEndRef = useRef(0);
 
     useEffect(() => {
         driversRef.current = drivers;
     }, [drivers]);
+
+    useEffect(() => {
+        if (!isClient) {
+            return undefined;
+        }
+
+        const audio = new Audio(RACE_ENGINE_SOUND);
+        audio.loop = false;
+        audio.volume = 0.8;
+        raceAudioRef.current = audio;
+
+        const updateLoopEnd = () => {
+            raceAudioLoopStartRef.current = Math.min(
+                RACE_ENGINE_TRIM_START_SECONDS,
+                Math.max(0, audio.duration - RACE_ENGINE_TRIM_END_SECONDS),
+            );
+            raceAudioLoopEndRef.current = Math.max(
+                raceAudioLoopStartRef.current,
+                audio.duration - RACE_ENGINE_TRIM_END_SECONDS,
+            );
+            audio.currentTime = raceAudioLoopStartRef.current;
+        };
+        const loopBeforeTrimmedEnd = () => {
+            if (
+                raceAudioLoopEndRef.current
+                && audio.currentTime >= raceAudioLoopEndRef.current
+            ) {
+                audio.currentTime = raceAudioLoopStartRef.current;
+                audio.play().catch(() => {});
+            }
+        };
+
+        audio.addEventListener("loadedmetadata", updateLoopEnd);
+        audio.addEventListener("timeupdate", loopBeforeTrimmedEnd);
+
+        return () => {
+            audio.removeEventListener("loadedmetadata", updateLoopEnd);
+            audio.removeEventListener("timeupdate", loopBeforeTrimmedEnd);
+            audio.pause();
+            raceAudioRef.current = null;
+        };
+    }, [isClient]);
 
     useEffect(() => {
         setIsClient(true);
@@ -321,6 +370,49 @@ export default function RaceActionPage() {
             setStreamStarted(false);
         }
     }, [countdown, streamStarted]);
+
+    useEffect(() => {
+        const audio = raceAudioRef.current;
+        if (!audio) {
+            return undefined;
+        }
+
+        if (engineSoundEnabled && streamStarted && !raceFinished) {
+            if (
+                raceAudioLoopEndRef.current
+                && audio.currentTime >= raceAudioLoopEndRef.current
+            ) {
+                audio.currentTime = raceAudioLoopStartRef.current;
+            }
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = raceAudioLoopStartRef.current;
+        }
+
+        return () => {
+            audio.pause();
+        };
+    }, [engineSoundEnabled, streamStarted, raceFinished]);
+
+    function toggleEngineSound() {
+        const audio = raceAudioRef.current;
+        const nextEnabled = !engineSoundEnabled;
+
+        setEngineSoundEnabled(nextEnabled);
+
+        if (!audio) {
+            return;
+        }
+
+        if (nextEnabled && streamStarted && !raceFinished) {
+            audio.currentTime = raceAudioLoopStartRef.current;
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = raceAudioLoopStartRef.current;
+        }
+    }
 
     useEffect(() => {
         if (!streamStarted) {
@@ -505,6 +597,14 @@ export default function RaceActionPage() {
                 style={{ marginBottom: '20px' }}
             >
                 Return to Bets
+            </button>
+            <button
+                className={`engine-sound-button ${engineSoundEnabled ? 'engine-sound-button-active' : ''}`}
+                type="button"
+                onClick={toggleEngineSound}
+                aria-pressed={engineSoundEnabled}
+            >
+                {engineSoundEnabled ? 'VROOM ON' : 'ENABLE VROOM'}
             </button>
             <RacePositionMap
                 racers={racerTelemetry.length > 0

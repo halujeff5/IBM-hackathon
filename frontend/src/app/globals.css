@@ -363,6 +363,29 @@ body {
   color: #9aa5b3;
 }
 
+.engine-sound-button {
+  display: block;
+  width: min(240px, calc(100% - 48px));
+  margin: 12px auto 20px;
+  padding: 10px 18px;
+  border: 2px solid #e10600;
+  border-radius: 10px;
+  background: #14171a;
+  color: #ffffff;
+  cursor: pointer;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.engine-sound-button:hover,
+.engine-sound-button-active {
+  background: #e10600;
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(225, 6, 0, 0.45);
+}
+
 .race-action-page {
   display: flex;
   flex-direction: column;
