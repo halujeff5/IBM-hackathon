@@ -85,7 +85,7 @@ body {
 .race-page {
   min-height: 100vh;
   padding-bottom: 100px;
-  background: #94a3b8;
+  background: #B8B8B8;
   color: #14171a;
 }
 
@@ -195,7 +195,8 @@ body {
 .over-under-grid-cell {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  grid-column: 1 / -1;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
   margin-top: 32px;
@@ -203,10 +204,11 @@ body {
 
 .over-under-heading {
   margin: 0;
-  text-align: center;
+  text-align: left;
 }
 
 .over-under-card.race-card {
+  width: min(260px, 100%);
   min-height: 0;
   gap: 12px;
 }
@@ -304,10 +306,140 @@ body {
   color: #d1d5db;
 }
 
+.race-card-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
+
+.race-card-disabled .driver-select,
+.race-card-disabled .race-text-input,
+.race-card-disabled .wager-control button,
+.race-card-disabled .wager-control input,
+.race-card-disabled .bet-button,
+.race-card-disabled .cancel-button {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.race-card-disabled span {
+  opacity: 0.8;
+}
+
+.proceed-to-race-button {
+  display: block;
+  width: min(320px, calc(100% - 48px));
+  margin: 18px auto 0;
+  padding: 12px 24px;
+  border: 2px solid #39ff14;
+  border-radius: 10px;
+  background: #39ff14;
+  color: #071007;
+  cursor: pointer;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.proceed-to-race-button:hover {
+  background: #071007;
+  color: #39ff14;
+}
+
+.proceed-to-race-button:disabled,
+.proceed-to-race-button-dimmed {
+  background: #3f4854;
+  border-color: #5f6b7a;
+  color: #9aa5b3;
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.85);
+}
+
+.proceed-to-race-button:disabled:hover,
+.proceed-to-race-button-dimmed:hover {
+  background: #3f4854;
+  color: #9aa5b3;
+}
+
+.race-action-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px 24px 24px;
+  background: #B8B8B8;
+}
+
+.racer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  margin: 28px auto 0;
+  padding: 0 12px 0 0;
+  box-sizing: border-box;
+}
+
+.active-bets-sidebar {
+  width: 100%;
+  max-width: 1120px;
+  margin: 20px auto 24px;
+}
+
+.active-bets-title {
+  margin: 0 0 18px;
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.active-bets-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.bet-placed-card {
+  min-height: 100px;
+  padding: 12px;
+  gap: 8px;
+}
+
+.bet-placed-card .bet-placed-market {
+  font-size: 14px;
+}
+
+.bet-placed-card .bet-placed-driver,
+.bet-placed-card .bet-placed-info,
+.bet-placed-card .bet-placed-amount {
+  width: 100%;
+  padding: 6px 8px;
+  border: 2px solid #39ff14;
+  border-radius: 8px;
+  background: #64748b;
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bet-placed-card .bet-placed-amount {
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .telemetry-shell {
+  width: 100%;
   min-height: 100vh;
   padding: 24px 12px 96px;
-  background: #f4f6f8;
+  background: #B8B8B8;
   color: #14171a;
 }
 
@@ -380,13 +512,15 @@ body {
 
 .race-title {
   margin: 0 0 18px;
-  color: #14171a;
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
   font-size: 32px;
   font-weight: 800;
   line-height: 1.05;
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0;
+  text-shadow: 0 0 14px rgba(57, 255, 20, 0.55);
 }
 
 .chart-title-row {
@@ -488,6 +622,19 @@ body {
   width: 100%;
   min-width: 0;
   min-height: 420px;
+}
+
+.recharts-panel .recharts-cartesian-axis-tick-value {
+  fill: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-weight: 800;
+}
+
+.recharts-panel .recharts-yAxis .recharts-cartesian-axis-tick-value {
+  fill: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
 }
 
 .podium-flash {
@@ -606,4 +753,568 @@ body {
   .podium-flash {
     grid-template-columns: 1fr;
   }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  animation: modal-fade-in 200ms ease-out;
+}
+
+.modal-content {
+  min-width: 280px;
+  padding: 32px 40px;
+  border: 3px solid #39ff14;
+  border-radius: 18px;
+  background: #14171a;
+  box-shadow: 0 0 32px rgba(57, 255, 20, 0.4);
+  animation: modal-scale-in 200ms ease-out;
+}
+
+.modal-content p {
+  margin: 0;
+  color: #39ff14;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+}
+
+.modal-content.modal-success {
+  border-color: #39ff14;
+  box-shadow: 0 0 32px rgba(57, 255, 20, 0.6);
+}
+
+.modal-content.modal-success p {
+  color: #39ff14;
+  text-shadow: 0 0 16px rgba(57, 255, 20, 0.8);
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.race-position-map {
+  width: min(1630px, calc(100% - 32px));
+  margin: 28px auto 36px;
+  padding: 18px;
+  border: 2px solid #14171a;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(20, 23, 26, 0.14);
+}
+
+.race-position-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.race-position-map-header h2 {
+  margin: 0;
+  color: #14171a;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.race-position-map-header span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.race-position-content {
+  display: grid;
+  grid-template-columns: 480px minmax(0, 1440px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.race-position-svg {
+  display: block;
+  width: 100%;
+  height: min(78vh, 820px);
+  min-height: 560px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.race-position-grid-bg {
+  fill: #ffffff;
+}
+
+.race-position-grid-line {
+  stroke: #e5e7eb;
+  stroke-width: 0.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.race-track-curb {
+  fill: none;
+  stroke: #9ca3af;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+}
+
+.race-track-asphalt {
+  fill: none;
+  stroke: #6b7280;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.35;
+}
+
+.race-position-empty-text {
+  fill: #64748b;
+  font-size: 4px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.race-position-featured {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.race-position-rank-row {
+  display: grid;
+  grid-template-columns: 26px 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #14171a;
+}
+
+.race-position-rank-number {
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.race-position-rank-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.race-position-driver-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.race-position-rank-row strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: "Formula1 Display Bold", "Arial Black", Impact, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+}
+
+.race-position-gap {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: #e10600;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .race-position-content {
+    grid-template-columns: 1fr;
+  }
+
+  .race-position-featured {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.ai-insight-panel {
+  width: min(760px, calc(100% - 48px));
+  margin: 24px auto;
+  padding: 24px;
+  border-radius: 18px;
+  background: #14171a;
+  color: white;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.ai-insight-panel h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+.ai-main-recommendation {
+  font-size: 22px;
+  font-weight: 800;
+  color: #facc15;
+  margin-bottom: 10px;
+}
+
+.ai-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.ai-metric-grid div {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.ai-metric-grid span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.ai-metric-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.ai-risk-note {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.analyze-button {
+  width: 100%;
+  padding: 9px 12px;
+  border: 2px solid #facc15;
+  border-radius: 10px;
+  background: #facc15;
+  color: #14171a;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.ai-header {
+  margin-bottom: 16px;
+}
+
+.ai-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #0f62fe;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.ai-header h2 {
+  margin: 0;
+  color: #facc15;
+  font-size: 28px;
+}
+
+.ai-bet-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  font-size: 16px;
+}
+
+.ai-bet-summary span,
+.ai-bet-summary strong {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ai-explanation-box {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ai-explanation-box h3 {
+  margin-top: 0;
+}
+
+.ai-explanation-box li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.analyze-button {
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+
+.driver-pill {
+  background: #0f62fe !important;
+  color: white;
+}
+
+.market-pill {
+  background: #198038 !important;
+  color: white;
+}
+
+.lap-pill {
+  background: #8a3ffc !important;
+  color: white;
+}
+
+.risk-low {
+  background: rgba(25, 128, 56, 0.25) !important;
+  border: 2px solid #198038;
+}
+
+.risk-medium {
+  background: rgba(252, 196, 25, 0.2) !important;
+  border: 2px solid #f1c21b;
+}
+
+.risk-high {
+  background: rgba(218, 30, 40, 0.2) !important;
+  border: 2px solid #da1e28;
+}
+
+.ai-bet-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.summary-pill {
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ai-header h2 {
+  color: #f1c21b;
+  font-size: 36px;
+  margin-top: 10px;
+}
+
+.ai-label {
+  background: #0f62fe;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.probability-card {
+  border: 1px solid #0f62fe;
+  box-shadow: 0 0 18px rgba(15, 98, 254, 0.35);
+}
+
+.confidence-card {
+  border: 1px solid #24a148;
+  box-shadow: 0 0 18px rgba(36, 161, 72, 0.35);
+}
+
+.risk-card {
+  border: 1px solid #f1c21b;
+  box-shadow: 0 0 18px rgba(241, 194, 27, 0.35);
+}
+
+.momentum-card {
+  border: 1px solid #8a3ffc;
+  box-shadow: 0 0 18px rgba(138, 63, 252, 0.35);
+}
+
+.confidence-breakdown-box {
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.08);
+}
+
+.confidence-breakdown-box h3 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  color: #facc15;
+}
+
+.confidence-row {
+  display: grid;
+  grid-template-columns: 210px 1fr 60px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.confidence-row span {
+  color: white;
+}
+
+.confidence-row strong {
+  color: white;
+  text-align: right;
+}
+
+.confidence-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  overflow: hidden;
+}
+
+.confidence-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #0f62fe,
+    #24a148,
+    #facc15
+  );
+}
+
+.ai-decision-banner {
+  margin: 14px 0 18px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  font-size: 20px;
+  font-weight: 900;
+  color: white;
+}
+
+.strong-value {
+  color: #24a148 !important;
+}
+
+.watchlist-value {
+  color: #facc15 !important;
+}
+
+.low-value {
+  color: #ff4d4f !important;
+}
+
+.ai-decision-banner.strong-value {
+  background: rgba(36, 161, 72, 0.18);
+  border: 1px solid #24a148;
+}
+
+.ai-decision-banner.watchlist-value {
+  background: rgba(250, 204, 21, 0.18);
+  border: 1px solid #facc15;
+}
+
+.ai-decision-banner.low-value {
+  background: rgba(255, 77, 79, 0.18);
+  border: 1px solid #ff4d4f;
+}
+
+.probability-card {
+  border: 1px solid #0f62fe;
+  box-shadow: 0 0 18px rgba(15, 98, 254, 0.35);
+}
+
+.confidence-card {
+  border: 1px solid #24a148;
+  box-shadow: 0 0 18px rgba(36, 161, 72, 0.35);
+}
+
+.risk-card {
+  border: 1px solid #f1c21b;
+  box-shadow: 0 0 18px rgba(241, 194, 27, 0.35);
+}
+
+.momentum-card {
+  border: 1px solid #8a3ffc;
+  box-shadow: 0 0 18px rgba(138, 63, 252, 0.35);
+}
+
+.confidence-breakdown-box {
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.08);
+}
+
+.confidence-breakdown-box h3 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  color: #facc15;
+}
+
+.confidence-row {
+  display: grid;
+  grid-template-columns: 210px 1fr 60px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.confidence-row span {
+  color: white;
+  font-size: 14px;
+}
+
+.confidence-row strong {
+  color: white;
+  text-align: right;
+}
+
+.confidence-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  overflow: hidden;
+}
+
+.confidence-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f62fe, #24a148, #facc15);
 }

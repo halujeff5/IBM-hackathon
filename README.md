@@ -31,3 +31,5 @@ npm run dev
 
 The frontend expects the backend to be running on `http://127.0.0.1:8001`.
 
+
+NOTE: The model we used to predict the win probabilities was first an XGBoostRanker model and is in the /backend/models folder. We run a Monte Carlo simulation 10_000 times to come up with the win probabilities.
