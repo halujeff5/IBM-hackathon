@@ -11,9 +11,10 @@ import RacerCard from "./RacerCard";
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const BETTING_PAGE_ROUTE = "/race";
+const BETTING_COUNTDOWN_SECONDS = 120;
 const RACER_CARD_LIMIT = 6;
 const POINT_STEP = 8;
-const REALTIME_PLAYBACK_RATE = 10;
+const REALTIME_PLAYBACK_RATE = 15;
 const MAX_FRAME_DELAY_MS = 1200;
 const RACE_ENGINE_SOUND = "/sounds/f1engine.opus";
 const RACE_ENGINE_TRIM_START_SECONDS = 0.5;
@@ -576,6 +577,7 @@ export default function RaceActionPage() {
     const hasOverUnderBet = Boolean(activeOverUnderBet);
     const hasAnyBets = activeBets.length > 0 || hasOverUnderBet;
     const raceIsRunning = (countdown === 0 || streamStarted) && !raceFinished;
+    const canReturnToBets = raceFinished || !raceIsRunning;
     const activePredictionRecords = predictionCheckpoints[String(activePredictionLap)] ?? [];
     const activePredictionsByDriver = activePredictionLap
         ? predictionsFromRecords(activePredictionRecords)
@@ -593,14 +595,24 @@ export default function RaceActionPage() {
         return <main className="race-action-page" />;
     }
 
+    function handleReturnToBets() {
+        if (!canReturnToBets) {
+            return;
+        }
+
+        localStorage.setItem("countdown", String(BETTING_COUNTDOWN_SECONDS));
+        localStorage.setItem("countdownTimestamp", String(Date.now()));
+        router.push(BETTING_PAGE_ROUTE);
+    }
+
     return (
         <main className="race-action-page">
             <CountdownCard countdown={countdown} raceName="Miami Grand Prix" />
             <button
-                className={`proceed-to-race-button ${raceIsRunning ? 'proceed-to-race-button-dimmed' : ''}`}
+                className={`proceed-to-race-button ${canReturnToBets ? '' : 'proceed-to-race-button-dimmed'}`}
                 type="button"
-                onClick={() => router.push(BETTING_PAGE_ROUTE)}
-                disabled={raceIsRunning && !raceFinished}
+                onClick={handleReturnToBets}
+                disabled={!canReturnToBets}
                 style={{ marginBottom: '20px' }}
             >
                 Return to Bets

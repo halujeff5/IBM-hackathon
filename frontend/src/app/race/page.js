@@ -15,6 +15,30 @@ const CountdownCard = dynamic(() => import("./CountdownCard"), {
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const INITIAL_BANK = 500;
 const RACE_COUNTDOWN_SECONDS = 120; // 2 minutes
+const DEFAULT_DRIVERS = [
+  "ALB",
+  "ALO",
+  "ANT",
+  "BEA",
+  "BOR",
+  "BOT",
+  "COL",
+  "GAS",
+  "HAD",
+  "HAM",
+  "HUL",
+  "LAW",
+  "LEC",
+  "LIN",
+  "NOR",
+  "OCO",
+  "PER",
+  "PIA",
+  "RUS",
+  "SAI",
+  "STR",
+  "VER",
+];
 const BETTING_MARKETS = [
   "Race Winner",
   "Top 3 Finish",
@@ -89,7 +113,7 @@ function buildPlacedOverUnderBet(driver, side, wager, isPlaced) {
 
 export default function RacePage() {
   const router = useRouter();
-  const [drivers, setDrivers] = useState([]);
+  const [drivers, setDrivers] = useState(DEFAULT_DRIVERS);
   const [showIncompleteModal, setShowIncompleteModal] = useState(false);
   const [showBetPlacedModal, setShowBetPlacedModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -103,6 +127,7 @@ export default function RacePage() {
   const [overUnderWager, setOverUnderWager] = useState("");
   const [overUnderBetPlaced, setOverUnderBetPlaced] = useState(false);
   const [aiInsight, setAiInsight] = useState(null);
+  const [analyzingBetIndex, setAnalyzingBetIndex] = useState(null);
 
   // Calculate bank as INITIAL_BANK - totalWagered
   const bank = useMemo(() => {
@@ -139,7 +164,7 @@ export default function RacePage() {
     );
   }
 
-  function analyzeBet(index) {
+  async function analyzeBet(index) {
     const driver = selectedDrivers[index];
     const market = BETTING_MARKETS[index];
 
@@ -149,10 +174,40 @@ export default function RacePage() {
       return;
     }
 
-    fetch(`${API_URL}/ai/betting-insight/${driver}/${encodeURIComponent(market)}?lap=10`)
-      .then((response) => response.json())
-      .then((data) => setAiInsight(data))
-      .catch(() => setAiInsight(null));
+    setAnalyzingBetIndex(index);
+    setAiInsight({
+      loading: true,
+      driver,
+      market,
+      lap: 10,
+    });
+
+    try {
+      const response = await fetch(
+        `${API_URL}/ai/betting-insight/${encodeURIComponent(driver)}/${encodeURIComponent(market)}?lap=10`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`AI insight request failed with ${response.status}`);
+      }
+
+      setAiInsight(await response.json());
+    } catch (error) {
+      setAiInsight({
+        error: true,
+        driver,
+        market,
+        lap: 10,
+        recommendation: "AI insight unavailable",
+        reasons: [
+          error instanceof TypeError
+            ? "The backend is not running on http://127.0.0.1:8001."
+            : "The backend AI insight endpoint returned an error.",
+        ],
+      });
+    } finally {
+      setAnalyzingBetIndex(null);
+    }
   }
 
   function placeBet(index) {
@@ -303,12 +358,24 @@ export default function RacePage() {
     
     const savedOverUnderBetPlaced = localStorage.getItem('overUnderBetPlaced');
     if (savedOverUnderBetPlaced) setOverUnderBetPlaced(savedOverUnderBetPlaced === 'true');
+
+    const savedDriversList = localStorage.getItem('discoveredDrivers');
+    if (savedDriversList) {
+      const parsedDrivers = JSON.parse(savedDriversList);
+      if (Array.isArray(parsedDrivers) && parsedDrivers.length) {
+        setDrivers(parsedDrivers);
+      }
+    }
     
     // Fetch drivers
     fetch(`${API_URL}/`)
       .then((response) => response.json())
-      .then((data) => setDrivers(data.drivers ?? []))
-      .catch(() => setDrivers([]));
+      .then((data) => {
+        const fetchedDrivers = data.drivers?.length ? data.drivers : DEFAULT_DRIVERS;
+        setDrivers(fetchedDrivers);
+        localStorage.setItem('discoveredDrivers', JSON.stringify(fetchedDrivers));
+      })
+      .catch(() => setDrivers(DEFAULT_DRIVERS));
 
     setStorageLoaded(true);
   }, []);
@@ -400,6 +467,7 @@ export default function RacePage() {
             onPlaceBet={placeBet}
             onCancelBet={cancelBet}
             onAnalyzeBet={analyzeBet}
+            analyzing={analyzingBetIndex === index}
             disabled={countdown <= 10}
           />
         ))}

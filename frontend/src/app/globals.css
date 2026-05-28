@@ -680,6 +680,10 @@ body {
   @apply mx-auto my-6 w-[min(760px,calc(100%-48px))] rounded-[18px] bg-[#14171a] p-6 text-white shadow-[0_18px_40px_rgba(0,0,0,0.25)];
 }
 
+.ai-insight-error {
+  @apply border-2 border-[#ff4d4f];
+}
+
 .ai-insight-panel h2 {
   @apply m-0 mb-3 text-2xl;
 }
