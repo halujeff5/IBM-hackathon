@@ -13,7 +13,7 @@ const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const BETTING_PAGE_ROUTE = "/race";
 const RACER_CARD_LIMIT = 6;
 const POINT_STEP = 8;
-const REALTIME_PLAYBACK_RATE = 20;
+const REALTIME_PLAYBACK_RATE = 10;
 const MAX_FRAME_DELAY_MS = 1200;
 const RACE_ENGINE_SOUND = "/sounds/f1engine.opus";
 const RACE_ENGINE_TRIM_START_SECONDS = 0.5;
@@ -222,6 +222,7 @@ export default function RaceActionPage() {
     const [predictionCheckpoints, setPredictionCheckpoints] = useState({});
     const [predictionCheckpointLaps, setPredictionCheckpointLaps] = useState([]);
     const [activePredictionLap, setActivePredictionLap] = useState(null);
+    const [lapStreamUrl, setLapStreamUrl] = useState("/laps/stream");
     const [engineSoundEnabled, setEngineSoundEnabled] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const driversRef = useRef(drivers);
@@ -333,8 +334,14 @@ export default function RaceActionPage() {
 
         fetch(`${API_URL}/`)
             .then((response) => response.json())
-            .then((data) => setDrivers(data.drivers ?? []))
-            .catch(() => setDrivers([]));
+            .then((data) => {
+                setDrivers(data.drivers ?? []);
+                setLapStreamUrl(data.streamUrl ?? "/laps/stream");
+            })
+            .catch(() => {
+                setDrivers([]);
+                setLapStreamUrl("/laps/stream");
+            });
 
         fetch(`${API_URL}/predictions`)
             .then((response) => response.json())
@@ -419,7 +426,7 @@ export default function RaceActionPage() {
             return;
         }
 
-        const events = new EventSource(`${API_URL}/laps/stream`);
+        const events = new EventSource(new URL(lapStreamUrl, API_URL).toString());
         const queue = [];
         let timer = null;
         let animating = false;
@@ -520,7 +527,7 @@ export default function RaceActionPage() {
             events.close();
             clearTimeout(timer);
         };
-    }, [streamStarted]);
+    }, [streamStarted, lapStreamUrl]);
 
     const currentLap = racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0
         ? racerTelemetry[0].lap

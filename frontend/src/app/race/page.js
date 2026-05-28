@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import BettingCard from "./BettingCard";
+import AIInsightPanel from "./AIInsightPanel";
 
 const CountdownCard = dynamic(() => import("./CountdownCard"), {
   ssr: false,
@@ -21,7 +22,7 @@ const BETTING_MARKETS = [
   "1st Place +5 Sec",
   "2nd Place",
   "3rd Place",
-  "",
+  "Fastest Lap",
   "1st Place +2 Sec",
 ];
 
@@ -101,6 +102,7 @@ export default function RacePage() {
   const [overUnderSide, setOverUnderSide] = useState("");
   const [overUnderWager, setOverUnderWager] = useState("");
   const [overUnderBetPlaced, setOverUnderBetPlaced] = useState(false);
+  const [aiInsight, setAiInsight] = useState(null);
 
   // Calculate bank as INITIAL_BANK - totalWagered
   const bank = useMemo(() => {
@@ -135,6 +137,22 @@ export default function RacePage() {
         driverIndex === index ? driver : d
       ),
     );
+  }
+
+  function analyzeBet(index) {
+    const driver = selectedDrivers[index];
+    const market = BETTING_MARKETS[index];
+
+    if (!driver || !market) {
+      setShowIncompleteModal(true);
+      setTimeout(() => setShowIncompleteModal(false), 2000);
+      return;
+    }
+
+    fetch(`${API_URL}/ai/betting-insight/${driver}/${encodeURIComponent(market)}?lap=10`)
+      .then((response) => response.json())
+      .then((data) => setAiInsight(data))
+      .catch(() => setAiInsight(null));
   }
 
   function placeBet(index) {
@@ -365,6 +383,8 @@ export default function RacePage() {
       >
         Proceed to Race
       </button>
+      <AIInsightPanel insight={aiInsight} />
+
       <section className="race-card-grid">
         {BETTING_MARKETS.map((market, index) => (
           <BettingCard
@@ -379,6 +399,7 @@ export default function RacePage() {
             onDriverChange={updateDriver}
             onPlaceBet={placeBet}
             onCancelBet={cancelBet}
+            onAnalyzeBet={analyzeBet}
             disabled={countdown <= 10}
           />
         ))}

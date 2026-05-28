@@ -13,6 +13,7 @@ export default function BettingCard({
   onDriverChange,
   onPlaceBet,
   onCancelBet,
+  onAnalyzeBet,
   disabled = false,
 }) {
   function updateWager(step) {
@@ -81,6 +82,14 @@ export default function BettingCard({
             disabled={disabled}
           >
             CANCEL
+          </button>
+          <button
+            className="analyze-button"
+            type="button"
+            onClick={() => onAnalyzeBet && onAnalyzeBet(index)}
+            disabled={disabled}
+          >
+            AI ANALYZE BET
           </button>
         </div>
       </div>
