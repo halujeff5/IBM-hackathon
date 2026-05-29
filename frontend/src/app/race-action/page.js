@@ -625,6 +625,36 @@ export default function RaceActionPage() {
             >
                 {engineSoundEnabled ? 'VROOM ON' : 'ENABLE VROOM'}
             </button>
+<aside className="active-bets-sidebar">
+                    <h2 className="active-bets-title">Active Bets</h2>
+                    <div className="active-bets-grid">
+                        {activeBets.map((bet) => (
+                            <BetPlacedCard
+                                key={`active-${bet.market}-${bet.index}-${activePredictionLap ?? 'final'}`}
+                                driver={bet.driver}
+                                betAmount={bet.wager}
+                                selected={bet.selected}
+                                bettingMarket={bet.market}
+                                {...predictionForMarket(
+                                    bet.market,
+                                    bet.driver,
+                                    activePredictionsByDriver,
+                                )}
+                            />
+                        ))}
+                        {hasOverUnderBet && (
+                            <BetPlacedCard
+                                key="active-over-under"
+                                driver={activeOverUnderBet.driver}
+                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
+                                selected={true}
+                                bettingMarket={activeOverUnderBet.bettingMarket}
+                                overUnder={activeOverUnderBet.overUnder}
+                            />
+                        )}
+                    </div>
+                </aside>
+
             <RacePositionMap
                 racers={racerTelemetry.length > 0
                     ? sortedByRacePosition(racerTelemetry)
@@ -658,37 +688,6 @@ export default function RaceActionPage() {
                     />
                 ))}
             </section>
-            {hasAnyBets && (
-                <aside className="active-bets-sidebar">
-                    <h2 className="active-bets-title">Active Bets</h2>
-                    <div className="active-bets-grid">
-                        {activeBets.map((bet) => (
-                            <BetPlacedCard
-                                key={`active-${bet.market}-${bet.index}-${activePredictionLap ?? 'final'}`}
-                                driver={bet.driver}
-                                betAmount={bet.wager}
-                                selected={bet.selected}
-                                bettingMarket={bet.market}
-                                {...predictionForMarket(
-                                    bet.market,
-                                    bet.driver,
-                                    activePredictionsByDriver,
-                                )}
-                            />
-                        ))}
-                        {hasOverUnderBet && (
-                            <BetPlacedCard
-                                key="active-over-under"
-                                driver={activeOverUnderBet.driver}
-                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
-                                selected={true}
-                                bettingMarket={activeOverUnderBet.bettingMarket}
-                                overUnder={activeOverUnderBet.overUnder}
-                            />
-                        )}
-                    </div>
-                </aside>
-            )}
         </main>
     )
 }

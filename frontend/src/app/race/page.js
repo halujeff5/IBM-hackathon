@@ -14,7 +14,7 @@ const CountdownCard = dynamic(() => import("./CountdownCard"), {
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const INITIAL_BANK = 500;
-const RACE_COUNTDOWN_SECONDS = 120; // 2 minutes
+const RACE_COUNTDOWN_SECONDS = 999999; // 2 minutes
 const DEFAULT_DRIVERS = [
   "ALB",
   "ALO",
@@ -409,13 +409,6 @@ export default function RacePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-navigate to race-action page when countdown reaches zero
-  useEffect(() => {
-    if (countdown === 0) {
-      router.push('/race-action');
-    }
-  }, [countdown, router]);
-
   // Don't render until client-side hydration is complete
   if (!isClient) {
     return null;
@@ -468,7 +461,7 @@ export default function RacePage() {
             onCancelBet={cancelBet}
             onAnalyzeBet={analyzeBet}
             analyzing={analyzingBetIndex === index}
-            disabled={countdown <= 10}
+            disabled={false}
           />
         ))}
 
@@ -481,7 +474,7 @@ export default function RacePage() {
               aria-label="First lap 90 sec driver"
               value={overUnderDriver}
               onChange={(event) => setOverUnderDriver(event.target.value)}
-              disabled={countdown <= 10}
+              disabled={false}
             >
               <option value="" disabled>
                 Select Driver
@@ -497,7 +490,7 @@ export default function RacePage() {
               aria-label="Over or under"
               value={overUnderSide}
               onChange={(event) => setOverUnderSide(event.target.value)}
-              disabled={countdown <= 10}
+              disabled={false}
             >
               <option value="" disabled>
                 Over / Under
@@ -507,7 +500,7 @@ export default function RacePage() {
             </select>
             <div className="wager-field">
               <div className="wager-control" aria-label="First lap 90 sec wager">
-                <button type="button" onClick={() => updateOverUnderWager(-1)} disabled={countdown <= 10}>
+                <button type="button" onClick={() => updateOverUnderWager(-1)} disabled={false}>
                   -
                 </button>
                 <input
@@ -522,9 +515,9 @@ export default function RacePage() {
                     const value = event.target.value;
                     setOverUnderWager(value === "" ? "" : String(Math.max(0, Number(value))));
                   }}
-                  disabled={countdown <= 10}
+                  disabled={false}
                 />
-                <button type="button" onClick={() => updateOverUnderWager(1)} disabled={countdown <= 10}>
+                <button type="button" onClick={() => updateOverUnderWager(1)} disabled={false}>
                   +
                 </button>
               </div>
@@ -533,7 +526,7 @@ export default function RacePage() {
                   className="bet-button"
                   type="button"
                   onClick={placeOverUnderBet}
-                  disabled={countdown <= 10}
+                  disabled={false}
                 >
                   BET
                 </button>
@@ -541,7 +534,7 @@ export default function RacePage() {
                   className="cancel-button"
                   type="button"
                   onClick={cancelOverUnderBet}
-                  disabled={countdown <= 10}
+                  disabled={false}
                 >
                   CANCEL
                 </button>

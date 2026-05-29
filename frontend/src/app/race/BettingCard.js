@@ -36,7 +36,7 @@ export default function BettingCard({
         className="driver-select"
         value={selectedDriver}
         onChange={(e) => onDriverChange && onDriverChange(index, e.target.value)}
-        disabled={disabled}
+        disabled={false}
       >
         <option value="" disabled>
           Select Driver
@@ -49,7 +49,7 @@ export default function BettingCard({
       </select>
       <div className="wager-field">
         <div className="wager-control" aria-label={`${market || "Bet"} wager`}>
-          <button type="button" onClick={() => updateWager(-1)} disabled={disabled}>
+          <button type="button" onClick={() => updateWager(-1)} disabled={false}>
             -
           </button>
           <input
@@ -61,9 +61,9 @@ export default function BettingCard({
             placeholder="0"
             value={wager}
             onChange={handleInputChange}
-            disabled={disabled}
+            disabled={false}
           />
-          <button type="button" onClick={() => updateWager(1)} disabled={disabled}>
+          <button type="button" onClick={() => updateWager(1)} disabled={false}>
             +
           </button>
         </div>
@@ -72,7 +72,7 @@ export default function BettingCard({
             className="bet-button"
             type="button"
             onClick={() => onPlaceBet(index)}
-            disabled={disabled}
+            disabled={false}
           >
             BET
           </button>
@@ -80,7 +80,7 @@ export default function BettingCard({
             className="cancel-button"
             type="button"
             onClick={() => onCancelBet(index)}
-            disabled={disabled}
+            disabled={false}
           >
             CANCEL
           </button>
@@ -88,7 +88,7 @@ export default function BettingCard({
             className="analyze-button"
             type="button"
             onClick={() => onAnalyzeBet && onAnalyzeBet(index)}
-            disabled={disabled || analyzing}
+            disabled={false}
           >
             {analyzing ? "ANALYZING..." : "AI ANALYZE BET"}
           </button>
