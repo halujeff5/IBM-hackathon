@@ -48,6 +48,51 @@ POSITIONS_CSV_COLUMNS = [
 ]
 
 
+class CompatStringDtype:
+    def __init__(self, storage="python", na_value=None):
+        self.storage = storage
+        self.na_value = na_value
+
+
+class CompatStringArray:
+    dtype = object
+
+    def __setstate__(self, state):
+        self.values = state[1] if isinstance(state, tuple) and len(state) > 1 else []
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __len__(self):
+        return len(self.values)
+
+    def __getitem__(self, index):
+        return self.values[index]
+
+    def __array__(self, dtype=None):
+        return np.array(self.values, dtype=dtype or object)
+
+
+def compat_unpickle_ndarray_backed(cls, checksum, state):
+    if getattr(cls, "__name__", "") == "StringArray":
+        return CompatStringArray()
+
+    from pandas._libs.arrays import __pyx_unpickle_NDArrayBacked
+
+    return __pyx_unpickle_NDArrayBacked(cls, checksum, state)
+
+
+class TelemetryUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == "pandas._libs.arrays" and name == "__pyx_unpickle_NDArrayBacked":
+            return compat_unpickle_ndarray_backed
+
+        if module.startswith("pandas") and name == "StringDtype":
+            return CompatStringDtype
+
+        return super().find_class(module, name)
+
+
 def discover_lap_files():
     lap_files = {}
 
@@ -81,8 +126,10 @@ def lap_path(driver, lap_number, lap_files=None):
 
 @lru_cache(maxsize=None)
 def load_lap_file(path):
-    with Path(path).open("rb") as file:
-        return pickle.load(file)
+    lap_path = Path(path)
+
+    with lap_path.open("rb") as file:
+        return TelemetryUnpickler(file).load()
 
 
 def load_lap(driver, lap_number, lap_files=None):
@@ -501,6 +548,7 @@ async def stream_predictions():
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
+
 def calculate_confidence(position, gap, probability):
     confidence = 50
 
@@ -617,4 +665,3 @@ def build_ai_betting_insight(driver: str, market: str, lap_number: int = 10):
 @app.get("/ai/betting-insight/{driver}/{market}")
 async def fetch_ai_betting_insight(driver: str, market: str, lap: int = 10):
     return build_ai_betting_insight(driver, market, lap)
-

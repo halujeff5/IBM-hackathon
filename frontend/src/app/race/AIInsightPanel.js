@@ -33,8 +33,37 @@ export default function AIInsightPanel({ insight }) {
     return null;
   }
 
+  if (insight.loading) {
+    return (
+      <section className="ai-insight-panel">
+        <div className="ai-header">
+          <span className="ai-label">IBM AI Betting Intelligence</span>
+          <h2>Analyzing Bet...</h2>
+        </div>
+        <p className="ai-risk-note">
+          Reviewing {insight.driver} for {insight.market}.
+        </p>
+      </section>
+    );
+  }
+
+  if (insight.error) {
+    return (
+      <section className="ai-insight-panel ai-insight-error">
+        <div className="ai-header">
+          <span className="ai-label">IBM AI Betting Intelligence</span>
+          <h2>{insight.recommendation}</h2>
+        </div>
+        <p className="ai-risk-note">
+          {insight.reasons?.[0] ?? "Try again once the backend is running."}
+        </p>
+      </section>
+    );
+  }
+
   const confidenceBreakdown = insight.confidenceBreakdown ?? {};
   const recClass = recommendationClass(insight.recommendation);
+  const reasons = insight.reasons ?? [];
 
   return (
     <section className="ai-insight-panel">
@@ -103,7 +132,7 @@ export default function AIInsightPanel({ insight }) {
       <div className="ai-explanation-box">
         <h3>Why this recommendation?</h3>
         <ul>
-          {insight.reasons.map((reason) => (
+          {reasons.map((reason) => (
             <li key={reason}>{reason}</li>
           ))}
         </ul>

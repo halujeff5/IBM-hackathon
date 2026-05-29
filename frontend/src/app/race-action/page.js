@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import RacePositionMap from "./RacePositionMap";
 import BetPlacedCard from "./BetPlacedCard";
 import CountdownCard from "../race/CountdownCard";
@@ -11,10 +11,14 @@ import RacerCard from "./RacerCard";
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8001";
 const BETTING_PAGE_ROUTE = "/race";
+const BETTING_COUNTDOWN_SECONDS = 120;
 const RACER_CARD_LIMIT = 6;
 const POINT_STEP = 8;
-const REALTIME_PLAYBACK_RATE = 20;
+const REALTIME_PLAYBACK_RATE = 15;
 const MAX_FRAME_DELAY_MS = 1200;
+const RACE_ENGINE_SOUND = "/sounds/f1engine.opus";
+const RACE_ENGINE_TRIM_START_SECONDS = 0.5;
+const RACE_ENGINE_TRIM_END_SECONDS = 1.5;
 
 function telemetryFromPoint(point = {}) {
     return {
@@ -201,6 +205,7 @@ function checkpointForLap(currentLap, checkpointLaps) {
 }
 
 export default function RaceActionPage() {
+    const router = useRouter();
     const [selectedBets, setSelectedBets] = useState([]);
     const [bettingMarkets, setBettingMarkets] = useState([]);
     const [wagers, setWagers] = useState([]);
@@ -218,12 +223,59 @@ export default function RaceActionPage() {
     const [predictionCheckpoints, setPredictionCheckpoints] = useState({});
     const [predictionCheckpointLaps, setPredictionCheckpointLaps] = useState([]);
     const [activePredictionLap, setActivePredictionLap] = useState(null);
+    const [lapStreamUrl, setLapStreamUrl] = useState("/laps/stream");
+    const [engineSoundEnabled, setEngineSoundEnabled] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const driversRef = useRef(drivers);
+    const raceAudioRef = useRef(null);
+    const raceAudioLoopStartRef = useRef(0);
+    const raceAudioLoopEndRef = useRef(0);
 
     useEffect(() => {
         driversRef.current = drivers;
     }, [drivers]);
+
+    useEffect(() => {
+        if (!isClient) {
+            return undefined;
+        }
+
+        const audio = new Audio(RACE_ENGINE_SOUND);
+        audio.loop = false;
+        audio.volume = 0.8;
+        raceAudioRef.current = audio;
+
+        const updateLoopEnd = () => {
+            raceAudioLoopStartRef.current = Math.min(
+                RACE_ENGINE_TRIM_START_SECONDS,
+                Math.max(0, audio.duration - RACE_ENGINE_TRIM_END_SECONDS),
+            );
+            raceAudioLoopEndRef.current = Math.max(
+                raceAudioLoopStartRef.current,
+                audio.duration - RACE_ENGINE_TRIM_END_SECONDS,
+            );
+            audio.currentTime = raceAudioLoopStartRef.current;
+        };
+        const loopBeforeTrimmedEnd = () => {
+            if (
+                raceAudioLoopEndRef.current
+                && audio.currentTime >= raceAudioLoopEndRef.current
+            ) {
+                audio.currentTime = raceAudioLoopStartRef.current;
+                audio.play().catch(() => {});
+            }
+        };
+
+        audio.addEventListener("loadedmetadata", updateLoopEnd);
+        audio.addEventListener("timeupdate", loopBeforeTrimmedEnd);
+
+        return () => {
+            audio.removeEventListener("loadedmetadata", updateLoopEnd);
+            audio.removeEventListener("timeupdate", loopBeforeTrimmedEnd);
+            audio.pause();
+            raceAudioRef.current = null;
+        };
+    }, [isClient]);
 
     useEffect(() => {
         setIsClient(true);
@@ -283,8 +335,14 @@ export default function RaceActionPage() {
 
         fetch(`${API_URL}/`)
             .then((response) => response.json())
-            .then((data) => setDrivers(data.drivers ?? []))
-            .catch(() => setDrivers([]));
+            .then((data) => {
+                setDrivers(data.drivers ?? []);
+                setLapStreamUrl(data.streamUrl ?? "/laps/stream");
+            })
+            .catch(() => {
+                setDrivers([]);
+                setLapStreamUrl("/laps/stream");
+            });
 
         fetch(`${API_URL}/predictions`)
             .then((response) => response.json())
@@ -322,11 +380,54 @@ export default function RaceActionPage() {
     }, [countdown, streamStarted]);
 
     useEffect(() => {
+        const audio = raceAudioRef.current;
+        if (!audio) {
+            return undefined;
+        }
+
+        if (engineSoundEnabled && streamStarted && !raceFinished) {
+            if (
+                raceAudioLoopEndRef.current
+                && audio.currentTime >= raceAudioLoopEndRef.current
+            ) {
+                audio.currentTime = raceAudioLoopStartRef.current;
+            }
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = raceAudioLoopStartRef.current;
+        }
+
+        return () => {
+            audio.pause();
+        };
+    }, [engineSoundEnabled, streamStarted, raceFinished]);
+
+    function toggleEngineSound() {
+        const audio = raceAudioRef.current;
+        const nextEnabled = !engineSoundEnabled;
+
+        setEngineSoundEnabled(nextEnabled);
+
+        if (!audio) {
+            return;
+        }
+
+        if (nextEnabled && streamStarted && !raceFinished) {
+            audio.currentTime = raceAudioLoopStartRef.current;
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = raceAudioLoopStartRef.current;
+        }
+    }
+
+    useEffect(() => {
         if (!streamStarted) {
             return;
         }
 
-        const events = new EventSource(`${API_URL}/laps/stream`);
+        const events = new EventSource(new URL(lapStreamUrl, API_URL).toString());
         const queue = [];
         let timer = null;
         let animating = false;
@@ -427,7 +528,7 @@ export default function RaceActionPage() {
             events.close();
             clearTimeout(timer);
         };
-    }, [streamStarted]);
+    }, [streamStarted, lapStreamUrl]);
 
     const currentLap = racerTelemetry.length > 0 && racerTelemetry[0]?.lap > 0
         ? racerTelemetry[0].lap
@@ -476,6 +577,7 @@ export default function RaceActionPage() {
     const hasOverUnderBet = Boolean(activeOverUnderBet);
     const hasAnyBets = activeBets.length > 0 || hasOverUnderBet;
     const raceIsRunning = (countdown === 0 || streamStarted) && !raceFinished;
+    const canReturnToBets = raceFinished || !raceIsRunning;
     const activePredictionRecords = predictionCheckpoints[String(activePredictionLap)] ?? [];
     const activePredictionsByDriver = activePredictionLap
         ? predictionsFromRecords(activePredictionRecords)
@@ -493,28 +595,66 @@ export default function RaceActionPage() {
         return <main className="race-action-page" />;
     }
 
+    function handleReturnToBets() {
+        if (!canReturnToBets) {
+            return;
+        }
+
+        localStorage.setItem("countdown", String(BETTING_COUNTDOWN_SECONDS));
+        localStorage.setItem("countdownTimestamp", String(Date.now()));
+        router.push(BETTING_PAGE_ROUTE);
+    }
+
     return (
         <main className="race-action-page">
             <CountdownCard countdown={countdown} raceName="Miami Grand Prix" />
-            <Link
-                href="/race"
-                className="proceed-to-race-button"
-                style={{
-                    marginBottom: "20px",
-                    display: "inline-block",
-                    textAlign: "center",
-                    textDecoration: "none",
-                    position: "relative",
-                    zIndex: 9999,
-                    padding: "12px 24px",
-                    background: "#e10600",
-                    color: "white",
-                    borderRadius: "6px",
-                    fontWeight: "bold",
-                }}
+            <button
+                className={`proceed-to-race-button ${canReturnToBets ? '' : 'proceed-to-race-button-dimmed'}`}
+                type="button"
+                onClick={handleReturnToBets}
+                disabled={!canReturnToBets}
+                style={{ marginBottom: '20px' }}
             >
                 Return to Bets
-            </Link>
+            </button>
+            <button
+                className={`engine-sound-button ${engineSoundEnabled ? 'engine-sound-button-active' : ''}`}
+                type="button"
+                onClick={toggleEngineSound}
+                aria-pressed={engineSoundEnabled}
+            >
+                {engineSoundEnabled ? 'VROOM ON' : 'ENABLE VROOM'}
+            </button>
+<aside className="active-bets-sidebar">
+                    <h2 className="active-bets-title">Active Bets</h2>
+                    <div className="active-bets-grid">
+                        {activeBets.map((bet) => (
+                            <BetPlacedCard
+                                key={`active-${bet.market}-${bet.index}-${activePredictionLap ?? 'final'}`}
+                                driver={bet.driver}
+                                betAmount={bet.wager}
+                                selected={bet.selected}
+                                bettingMarket={bet.market}
+                                {...predictionForMarket(
+                                    bet.market,
+                                    bet.driver,
+                                    activePredictionsByDriver,
+                                )}
+                            />
+                        ))}
+                        {hasOverUnderBet && (
+                            <BetPlacedCard
+                                key="active-over-under"
+                                driver={activeOverUnderBet.driver}
+                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
+                                selected={true}
+                                bettingMarket={activeOverUnderBet.bettingMarket}
+                                overUnder={activeOverUnderBet.overUnder}
+                            />
+                        )}
+                    </div>
+                </aside>
+
             <RacePositionMap
                 racers={racerTelemetry.length > 0
                     ? sortedByRacePosition(racerTelemetry)
@@ -548,37 +688,6 @@ export default function RaceActionPage() {
                     />
                 ))}
             </section>
-            {hasAnyBets && (
-                <aside className="active-bets-sidebar">
-                    <h2 className="active-bets-title">Active Bets</h2>
-                    <div className="active-bets-grid">
-                        {activeBets.map((bet) => (
-                            <BetPlacedCard
-                                key={`active-${bet.market}-${bet.index}-${activePredictionLap ?? 'final'}`}
-                                driver={bet.driver}
-                                betAmount={bet.wager}
-                                selected={bet.selected}
-                                bettingMarket={bet.market}
-                                {...predictionForMarket(
-                                    bet.market,
-                                    bet.driver,
-                                    activePredictionsByDriver,
-                                )}
-                            />
-                        ))}
-                        {hasOverUnderBet && (
-                            <BetPlacedCard
-                                key="active-over-under"
-                                driver={activeOverUnderBet.driver}
-                                betAmount={activeOverUnderBet.wager ?? activeOverUnderBet.betAmount}
-                                selected={true}
-                                bettingMarket={activeOverUnderBet.bettingMarket}
-                                overUnder={activeOverUnderBet.overUnder}
-                            />
-                        )}
-                    </div>
-                </aside>
-            )}
         </main>
     )
 }
