@@ -39,7 +39,3 @@ cd frontend
 npm install
 npm run dev
 ```
-
-The frontend expects the backend to be running on `http://127.0.0.1:8001`.
-
-
