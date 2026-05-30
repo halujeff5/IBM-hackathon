@@ -1,28 +1,39 @@
 # 🏎️ F1 Racing IBM 🏎️
 
 ## The Problem
-F1 Racing Fans can enjoy the sport by watching on a screen, attending the racetrack, or participating in fantasy leagues. However, fan engagement via sports betting can be explored to enhance fan engagement and connect the fan through actual emotional investment, building excitement and suspense with our platform.
+
+Formula 1 fans typically engage with the sport by watching races, attending events, or participating in fantasy leagues. However, sports betting provides another opportunity to increase fan engagement by creating a deeper emotional investment in race outcomes. Our platform enhances the fan experience by combining AI-powered betting insights, live race visualization, and real-time telemetry data to build excitement and suspense throughout a race.
 
 ## AI Technical Approach 🚦
-Through the use of statistical models in our intelligent betting, users can get win probability %, confidence % (data quality, race position reliability, timing gap reliability, etc.), risk level, and momentum. In addition to intelligent betting, users can witness the F1 driver's position in the racetrack along with their F1 car's telemetry data that is updated in real-time via each racer card in the race panel. Another AI prediction model calculates race telemetry data to guess the likelihood of your bet succeeding  during the race. This prediction model uses an XGBRanker Model followed by 10_000 Monet Carlo simulations to arrive at the prediction. The features in the XGBRanker model include car position, tire compound, the average lap time of the last 3 laps, and the pace delta or time behind leader. We utilized IBM Bob to code alot of our features in the backend and frontend. 
 
-The frontend begins with a landing page followed by a betting page which has a bank to keep track of bettor funds. The list of drivers of the race is listed in a dropdown and the money wager entry is below it. The bettor uses the AI Analyze Bet button to view the bet's quality, confidence interval, etc. Finally when the race begins, the fan sees the race live in an arcade track and sees their favorite F1 racer speed along the track followed by their racer's race card that streams the driver's telemetry data. Another AI model updates the bet's likelihood of succeeding in real-time.
+Our platform uses statistical and AI-driven models to help users make informed betting decisions. Before placing a bet, users can analyze a driver's probability of success, confidence score, risk level, and momentum indicators. Confidence scores are derived from factors such as race position reliability, timing gap reliability, telemetry quality, and prediction stability.
 
-## Why does this matter for racing? 🏆
-The sport of F1 racing is currently skewed toward the affluent. There is a much larger fanbase than that. Commoners want to enjoy the sport in other ways outside of spectating. Our platform allows the fan to cheer and engage in a whole new dimension via betting and builds suspense through AI prediction of their likelihood of winning their bet. Moreover, the addition of a betting AI tool guiding fan bet making pre-race makes the experience quite fun and engaging. The fan learns about the F1 racer's capabilities against their own intuition about racing. This added dimension helps popularize the sport and delivers it to the general public.
+In addition to intelligent betting support, users can view driver positions on a live racetrack along with telemetry indicators that update throughout the race. An AI prediction engine continuously evaluates race conditions and updates the likelihood of a user's bet succeeding as the race progresses.
+
+The prediction framework combines ranking-based machine learning techniques with Monte Carlo simulation to estimate race outcomes. Features considered include driver position, tire compound, recent lap performance, and pace relative to the race leader.
+
+IBM Bob was used throughout development to accelerate coding, debugging, feature implementation, and rapid prototyping across both the frontend and backend systems.
+
+The user experience begins on a Formula 1-themed landing page, followed by a betting dashboard where users can select drivers, choose betting markets, manage wager amounts, and evaluate bets using the AI Analyze Bet feature. Once the race begins, users can transition to the Race Action page, where they can monitor active bets, track vehicles on a live racetrack, view telemetry indicators, and receive continuously updated AI-generated betting insights.
+
+## Why Does This Matter for Racing? 🏆
+
+Formula 1 has traditionally been viewed as a sport with a high barrier to entry. However, its global fanbase extends far beyond those who can regularly attend races or participate in exclusive experiences.
+
+Our platform introduces a new dimension of engagement by allowing fans to actively participate through data-driven betting and real-time race analytics. AI-powered decision support helps users better understand race dynamics while creating a more interactive and educational experience. By combining sports analytics, live visualization, and intelligent betting recommendations, the platform makes Formula 1 more accessible, engaging, and immersive for a broader audience.
 
 ## Folder Structure
 
-This workspace is organized as a small full-stack project:
+This workspace is organized as a full-stack application:
 
-- `frontend/` - Next.js app
-- `backend/` - FastAPI service
-- `data/` - local Formula 1 telemetry and lap data
-- `docs/` - project reference documentation
+* `frontend/` – Next.js application
+* `backend/` – FastAPI service
+* `data/` – Formula 1 telemetry and lap data
+* `docs/` – Project documentation and reference materials
 
 ## Running the App
 
-## Backend
+### Backend
 
 ```bash
 ./run-backend.sh
@@ -36,10 +47,34 @@ cd backend
 .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8001
 ```
 
-## Frontend
+### Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
+### Local URLs
+
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+Backend:
+
+```text
+http://localhost:8001
+```
+
+## Technologies Used
+
+* Next.js
+* React
+* FastAPI
+* Python
+* JavaScript
+* IBM Bob
+* GitHub
