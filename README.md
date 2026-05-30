@@ -9,7 +9,9 @@ Through the use of statistical models in our intelligent betting, users can get 
 The frontend begins with a landing page followed by a betting page which has a bank to keep track of bettor funds. The list of drivers of the race is listed in a dropdown and the money wager entry is below it. The bettor uses the AI Analyze Bet button to view the bet's quality, confidence interval, etc. Finally when the race begins, the fan sees the race live in an arcade track and sees their favorite F1 racer speed along the track followed by their racer's race card that streams the driver's telemetry data. Another AI model updates the bet's likelihood of succeeding in real-time.
 
 ## Why does this matter for racing? 🏆
-The sport of F1 racing is currently skewed toward the affluent. There is a much larger fanbase than that. Commoners want to enjoy the sport in other ways outside of spectating. Our platform allows the fan to cheer and engage in a whole new dimension via betting and builds suspense through AI prediction of their likelihood of winning their bet. Moreover, the addition of a betting AI tool guiding fan bet making pre-race makes the experience quite fun and engaging. The fan learns about the F1 racer's capabilities against their own intuition about racing. This added dimension helps popularize the sport and delivers it to the general public.  
+The sport of F1 racing is currently skewed toward the affluent. There is a much larger fanbase than that. Commoners want to enjoy the sport in other ways outside of spectating. Our platform allows the fan to cheer and engage in a whole new dimension via betting and builds suspense through AI prediction of their likelihood of winning their bet. Moreover, the addition of a betting AI tool guiding fan bet making pre-race makes the experience quite fun and engaging. The fan learns about the F1 racer's capabilities against their own intuition about racing. This added dimension helps popularize the sport and delivers it to the general public.
+
+## Folder Structure
 
 This workspace is organized as a small full-stack project:
 
@@ -17,6 +19,8 @@ This workspace is organized as a small full-stack project:
 - `backend/` - FastAPI service
 - `data/` - local Formula 1 telemetry and lap data
 - `docs/` - project reference documentation
+
+## Running the App
 
 ## Backend
 
