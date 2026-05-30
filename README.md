@@ -139,7 +139,6 @@ docs/       - Project documentation
 
 ### Development Tools
 
-* IBM SkillsBuild
 * IBM Bob
 * Git
 * GitHub
